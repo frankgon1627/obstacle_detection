@@ -14,7 +14,7 @@ class PointCloudToGrid : public rclcpp::Node {
 public:
     PointCloudToGrid() : Node("pointcloud_to_grid"), tf_buffer_(this->get_clock()), tf_listener_(tf_buffer_) {
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            "/Odometry", 10, std::bind(&PointCloudToGrid::odomCallback, this, std::placeholders::_1));
+            "/dlio/odom_node/odom", 10, std::bind(&PointCloudToGrid::odomCallback, this, std::placeholders::_1));
         pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/groundgrid/segmented_cloud", 10, std::bind(&PointCloudToGrid::pointCloudCallback, this, std::placeholders::_1));
         
@@ -41,6 +41,7 @@ private:
         odom_ = *msg;
         occupancy_grid_.info.origin.position.x = odom_.pose.pose.position.x - static_cast<double>(width_) * resolution_ / 2.0;
         occupancy_grid_.info.origin.position.y = odom_.pose.pose.position.y - static_cast<double>(height_) * resolution_ / 2.0;
+        RCLCPP_INFO(this->get_logger(), "Got Odometry and Updated Map position");
     }
 
     void pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
