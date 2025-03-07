@@ -4,7 +4,6 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <unordered_set>
 
 class PointCloudToGrid : public rclcpp::Node {
 public:
@@ -38,11 +37,8 @@ private:
         // Reset grid
         std::fill(occupancy_grid_.data.begin(), occupancy_grid_.data.end(), -1);
 
-        std::unordered_set<float> intensity_values;
-
         for (const auto& point : cloud.points) {
-            intensity_values.insert(point.intensity);
-            if (point.intensity > 0.5) {  // Adjust intensity threshold as needed
+            if (point.intensity == 49.0) {  // Adjust intensity threshold as needed
                 int grid_x = static_cast<int>((point.x - occupancy_grid_.info.origin.position.x) / resolution_);
                 int grid_y = static_cast<int>((point.y - occupancy_grid_.info.origin.position.y) / resolution_);
                 
@@ -52,11 +48,6 @@ private:
             }
         }
 
-        RCLCPP_INFO(this->get_logger(), "Unique intensity values detected:");
-        for (const float& intensity : intensity_values) {
-            RCLCPP_INFO(this->get_logger(), "%f", intensity);
-        }
-        
         occupancy_grid_.header.stamp = this->now();
         occupancy_grid_pub_->publish(occupancy_grid_);
     }
