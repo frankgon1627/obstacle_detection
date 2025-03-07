@@ -56,6 +56,7 @@ private:
     }
 
     void pointcloud_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
+        RCLCPP_INFO(this->get_logger(), "Got Segmented Pointcloud");
         pcl::PointCloud<pcl::PointXYZI> cloud;
         pcl::fromROSMsg(*msg, cloud);
 
