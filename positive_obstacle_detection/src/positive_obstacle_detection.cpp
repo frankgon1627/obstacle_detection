@@ -42,7 +42,7 @@ private:
 
     void transform_callback(){
         try{
-            lidar_to_map_transform_ = tf_buffer_.lookupTransform("map", "os_sensor", tf2::TimePointZero);
+            lidar_to_map_transform_ = tf_buffer_.lookupTransform("os_sensor", "map", tf2::TimePointZero);
         }
         catch (const tf2::TransformException &ex){
             RCLCPP_ERROR(this->get_logger(), "Failed to get transform: %s", ex.what());
