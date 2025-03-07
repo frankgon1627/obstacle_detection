@@ -9,6 +9,7 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <unordered_set>
 
 class PointCloudToGrid : public rclcpp::Node {
 public:
@@ -57,6 +58,7 @@ private:
 
     void pointcloud_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
         RCLCPP_INFO(this->get_logger(), "Got Segmented Pointcloud");
+        std::unordered_set<float> unique_intensities;
         pcl::PointCloud<pcl::PointXYZI> cloud;
         pcl::fromROSMsg(*msg, cloud);
 
@@ -64,7 +66,8 @@ private:
         std::fill(occupancy_grid_.data.begin(), occupancy_grid_.data.end(), 0);
 
         for (const auto& point : cloud.points) {
-            if (point.intensity == 99.0) {  // Adjust intensity threshold as needed
+            unique_intensities.insert(point.intensity);
+            if (point.intensity == 99.0) { 
                 geometry_msgs::msg::PointStamped point_in, point_out;
                 point_in.header.frame_id = msg->header.frame_id;
                 point_in.point.x = point.x;
@@ -81,7 +84,12 @@ private:
                 }
             }
         }
+        RCLCPP_INFO(this->get_logger(), "Unique intensities:");
+        for (const float& intensity : unique_intensities) {
+            RCLCPP_INFO(this->get_logger(), "Intensity: %f", intensity);
+    }
 
+        RCLCPP_INFO(this->get_logger(), "Going to Publish Grid");
         occupancy_grid_.header.stamp = this->now();
         occupancy_grid_pub_->publish(occupancy_grid_);
     }
