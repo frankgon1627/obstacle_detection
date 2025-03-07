@@ -53,7 +53,7 @@ private:
 
         geometry_msgs::msg::TransformStamped transform_stamped;
         try {
-            transform_stamped = tf_buffer_.lookupTransform("map", "os_sensor", tf2::TimePointZero);
+            transform_stamped = tf_buffer_.lookupTransform("map", "os_sensor", tf2::TimePointZero, std::chrono::milliseconds(500));
         } catch (tf2::TransformException &ex) {
             RCLCPP_WARN(this->get_logger(), "Could not transform from os_sensor to map: %s", ex.what());
             return;
