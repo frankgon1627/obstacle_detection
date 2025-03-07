@@ -35,10 +35,10 @@ private:
         pcl::fromROSMsg(*msg, cloud);
 
         // Reset grid
-        std::fill(occupancy_grid_.data.begin(), occupancy_grid_.data.end(), -1);
+        std::fill(occupancy_grid_.data.begin(), occupancy_grid_.data.end(), 0);
 
         for (const auto& point : cloud.points) {
-            if (point.intensity == 49.0) {  // Adjust intensity threshold as needed
+            if (point.intensity == 99.0) {  // Adjust intensity threshold as needed
                 int grid_x = static_cast<int>((point.x - occupancy_grid_.info.origin.position.x) / resolution_);
                 int grid_y = static_cast<int>((point.y - occupancy_grid_.info.origin.position.y) / resolution_);
                 
