@@ -14,6 +14,7 @@ find_package(nav_msgs REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(pcl_ros REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2)
 
 add_executable(positive_obstacle_detection src/positive_obstacle_detection.cpp)
 ament_target_dependencies(positive_obstacle_detection 
@@ -23,7 +24,8 @@ ament_target_dependencies(positive_obstacle_detection
   pcl_conversions
   pcl_ros
   tf2_ros
-  geometry_msgs)
+  geometry_msgs
+  tf2)
 
 target_include_directories(positive_obstacle_detection PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
