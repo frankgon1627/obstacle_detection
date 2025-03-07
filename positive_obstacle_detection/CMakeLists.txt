@@ -7,11 +7,20 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(pcl_conversions REQUIRED)
+find_package(pcl_ros REQUIRED)
 
 add_executable(positive_obstacle_detection src/positive_obstacle_detection.cpp)
+ament_target_dependencies(positive_obstacle_detection 
+  rclcpp 
+  sensor_msgs 
+  nav_msgs
+  pcl_conversions
+  pcl_ros)
+
 target_include_directories(positive_obstacle_detection PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
