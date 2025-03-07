@@ -9,20 +9,19 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-#include <unordered_set>
+
+using namespace std;
 
 class PointCloudToGrid : public rclcpp::Node {
 public:
-    PointCloudToGrid() : Node("pointcloud_to_grid"), tf_buffer_(this->get_clock()), tf_listener_(tf_buffer_) {
+    PointCloudToGrid() : Node("pointcloud_to_grid") {
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            "/dlio/odom_node/odom", 10, std::bind(&PointCloudToGrid::odom_callback, this, std::placeholders::_1));
+            "/dlio/odom_node/odom", 10, bind(&PointCloudToGrid::odom_callback, this, placeholders::_1));
         pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/groundgrid/segmented_cloud", 10, std::bind(&PointCloudToGrid::pointcloud_callback, this, std::placeholders::_1));
+            "/groundgrid/segmented_cloud", 10, bind(&PointCloudToGrid::pointcloud_callback, this, placeholders::_1));
         
         occupancy_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/obstacle_detection/positive_obstacle_grid", 10);
-
-        timer_ = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&PointCloudToGrid::transform_callback, this));
         
         initializeOccupancyGrid();
     }
@@ -40,15 +39,6 @@ private:
         occupancy_grid_.data.resize(width_ * height_, -1); // Initialize with unknown occupancy
     }
 
-    void transform_callback(){
-        try{
-            lidar_to_map_transform_ = tf_buffer_.lookupTransform("map", "os_sensor", tf2::TimePointZero);
-        }
-        catch (const tf2::TransformException &ex){
-            RCLCPP_ERROR(this->get_logger(), "Failed to get transform: %s", ex.what());
-        }
-    }
-
     void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
         odom_ = *msg;
         occupancy_grid_.info.origin.position.x = odom_.pose.pose.position.x - static_cast<double>(width_) * resolution_ / 2.0;
@@ -57,24 +47,20 @@ private:
     }
 
     void pointcloud_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
-        RCLCPP_INFO(this->get_logger(), "Got Segmented Pointcloud");
-        std::unordered_set<float> unique_intensities;
         pcl::PointCloud<pcl::PointXYZI> cloud;
         pcl::fromROSMsg(*msg, cloud);
 
         // Reset grid
-        std::fill(occupancy_grid_.data.begin(), occupancy_grid_.data.end(), 0);
+        fill(occupancy_grid_.data.begin(), occupancy_grid_.data.end(), 0);
 
         for (const auto& point : cloud.points) {
-            unique_intensities.insert(point.intensity);
-            if (point.intensity == 99.0) { 
-                // geometry_msgs::msg::PointStamped point_in, point_out;
-                // point_in.header.frame_id = msg->header.frame_id;
-                // point_in.point.x = point.x;
-                // point_in.point.y = point.y;
-                // point_in.point.z = point.z;
+            // ignore any points that are too close to the Jackal
+            if (sqrt(pow(point.x - odom_.pose.pose.position.x, 2) + pow(point.y - odom_.pose.pose.position.y, 2)) < 0.5) {
+                continue;
+            }
 
-                // tf2::doTransform(point_in, point_out, lidar_to_map_transform_);
+            // insensity value indicating non-ground point
+            if (point.intensity == 99.0) { 
 
                 int grid_x = static_cast<int>((point.x - occupancy_grid_.info.origin.position.x) / resolution_);
                 int grid_y = static_cast<int>((point.y - occupancy_grid_.info.origin.position.y) / resolution_);
@@ -84,14 +70,10 @@ private:
                 }
             }
         }
-        RCLCPP_INFO(this->get_logger(), "Unique intensities:");
-        for (const float& intensity : unique_intensities) {
-            RCLCPP_INFO(this->get_logger(), "Intensity: %f", intensity);
-    }
 
-        RCLCPP_INFO(this->get_logger(), "Going to Publish Grid");
         occupancy_grid_.header.stamp = this->now();
         occupancy_grid_pub_->publish(occupancy_grid_);
+        RCLCPP_INFO(this->get_logger(), "Published Positive Occupancy Grid");
     }
 
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
@@ -103,12 +85,6 @@ private:
     double resolution_ = 0.2;
     int width_ = 100;
     int height_ = 100;
-
-    tf2_ros::Buffer tf_buffer_;
-    tf2_ros::TransformListener tf_listener_;
-
-    rclcpp::TimerBase::SharedPtr timer_;
-    geometry_msgs::msg::TransformStamped lidar_to_map_transform_;
 };
 
 int main(int argc, char **argv) {
