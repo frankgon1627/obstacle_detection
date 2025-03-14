@@ -54,13 +54,16 @@ private:
         fill(occupancy_grid_.data.begin(), occupancy_grid_.data.end(), 0);
 
         for (const auto& point : cloud.points) {
-            // ignore any points that are too close to the Jackal
-            if (sqrt(pow(point.x - odom_.pose.pose.position.x, 2) + pow(point.y - odom_.pose.pose.position.y, 2)) < 0.75) {
-                continue;
-            }
-
             // insensity value indicating non-ground point
             if (point.intensity == 99.0) { 
+                // ignore any points that are too close to the Jackal
+                if (sqrt(pow(point.x - odom_.pose.pose.position.x, 2) + pow(point.y - odom_.pose.pose.position.y, 2)) < 0.75) {
+                    continue;
+                }
+                // ignore any points that are well above the Jackal
+                if (point.z > 0.75){
+                    continue;
+                }
 
                 int grid_x = static_cast<int>((point.x - occupancy_grid_.info.origin.position.x) / resolution_);
                 int grid_y = static_cast<int>((point.y - occupancy_grid_.info.origin.position.y) / resolution_);
