@@ -55,7 +55,7 @@ private:
 
         for (const auto& point : cloud.points) {
             // ignore any points that are too close to the Jackal
-            if (sqrt(pow(point.x - odom_.pose.pose.position.x, 2) + pow(point.y - odom_.pose.pose.position.y, 2)) < 0.5) {
+            if (sqrt(pow(point.x - odom_.pose.pose.position.x, 2) + pow(point.y - odom_.pose.pose.position.y, 2)) < 0.75) {
                 continue;
             }
 
