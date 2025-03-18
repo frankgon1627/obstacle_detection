@@ -27,8 +27,10 @@ public:
     NegativeObstacleDetection() : Node("negative_obstacle_detection"), tf_buffer_(this->get_clock()), tf_listener_(tf_buffer_){
         occupancy_grid_subscriber_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
             "/planners/dialted_occupancy_grid", 10, bind(&NegativeObstacleDetection::occupancy_grid_callback, this, placeholders::_1));
+        auto point_cloud_qos = rclcpp::QoS(10);
+        point_cloud_qos.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
         point_cloud_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/ouster/points", 10, bind(&NegativeObstacleDetection::point_cloud_callback, this, placeholders::_1));
+            "/ouster/points", point_cloud_qos, bind(&NegativeObstacleDetection::point_cloud_callback, this, placeholders::_1));
         risk_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/planners/risk_map", 10);
         combined_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/planners/combined_map", 10);
         feature_points_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/planners/feature_points", 10);
