@@ -39,7 +39,8 @@ private:
         occupancy_grid_.info.origin.position.y = -static_cast<double>(height_) * resolution_ / 2.0;
         occupancy_grid_.info.origin.position.z = 0.0;
         occupancy_grid_.info.origin.orientation.w = 1.0;
-        occupancy_grid_.data.resize(width_ * height_, 0);
+        occupancy_grid_.data.resize(width_ * height_, -1);
+        fill(occupancy_grid_.data.begin(), occupancy_grid_.data.end(), 0);
     }
 
     void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
