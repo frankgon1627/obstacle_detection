@@ -151,6 +151,12 @@ private:
             tf2::Vector3 point1 = {correspondence[0], correspondence[1], correspondence[2]};
             tf2::Vector3 point2 = {correspondence[3], correspondence[4], correspondence[5]};
             float risk = correspondence[6];
+
+            // Filter out nonsensical feature points
+            if (abs(point1.y()) < 1.0 && -4 < point1.x() && point.x() < 0){
+                continue;
+            }
+
             // transform the points to the costmap frame
             tf2::Vector3 point1_cost_frame = tf2::quatRotate(tf_quaternion, point1) + tf_translation;
             tf2::Vector3 point2_cost_frame = tf2::quatRotate(tf_quaternion, point2) + tf_translation;
