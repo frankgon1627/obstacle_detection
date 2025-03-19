@@ -21,9 +21,9 @@ public:
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
             "/dlio/odom_node/odom", 10, bind(&PointCloudToGrid::odom_callback, this, placeholders::_1));
         pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/groundgrid/segmented_cloud", 10, bind(&PointCloudToGrid::pointcloud_callback, this, placeholders::_1));
+            "/groundgrid/segmented_cloud", 10, bind(&PointCloudToGrid::pointcloud_callback, this, placeholders::_1)); 
         occupancy_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
-            "/obstacle_detection/positive_obstacle_grid", 10);
+            "/obstacle_detection/positive_obstacle_grid1", 10);
         
         log_odds_.resize(width_ * height_, 0.0);
         initializeOccupancyGrid();
@@ -39,7 +39,7 @@ private:
         occupancy_grid_.info.origin.position.y = -static_cast<double>(height_) * resolution_ / 2.0;
         occupancy_grid_.info.origin.position.z = 0.0;
         occupancy_grid_.info.origin.orientation.w = 1.0;
-        occupancy_grid_.data.resize(width_ * height_, -1);
+        occupancy_grid_.data.resize(width_ * height_, 0);
     }
 
     void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
@@ -69,24 +69,24 @@ private:
         pcl::PointCloud<pcl::PointXYZI> cloud;
         pcl::fromROSMsg(*msg, cloud);
 
-        for (auto& log_odds : log_odds_) {
+        for (double& log_odds : log_odds_) {
             log_odds *= decay_factor_;
         }
 
         int robot_x = static_cast<int>((odom_.pose.pose.position.x - occupancy_grid_.info.origin.position.x) / resolution_);
         int robot_y = static_cast<int>((odom_.pose.pose.position.y - occupancy_grid_.info.origin.position.y) / resolution_);
 
-        for (size_t i = 0; i < log_odds_.size(); ++i) {
-            int x = i % width_;
-            int y = i / width_;
-            double world_x = occupancy_grid_.info.origin.position.x + x * resolution_;
-            double world_y = occupancy_grid_.info.origin.position.y + y * resolution_;
-            double distance = sqrt(pow(world_x - odom_.pose.pose.position.x, 2) + pow(world_y - odom_.pose.pose.position.y, 2));
-            if (distance > clearing_radius_) {
-                occupancy_grid_.data[i] = -1;
-                log_odds_[i] = 0.0;
-            }
-        }
+        // for (size_t i = 0; i < log_odds_.size(); ++i) {
+        //     int x = i % width_;
+        //     int y = i / width_;
+        //     double world_x = occupancy_grid_.info.origin.position.x + x * resolution_;
+        //     double world_y = occupancy_grid_.info.origin.position.y + y * resolution_;
+        //     double distance = sqrt(pow(world_x - odom_.pose.pose.position.x, 2) + pow(world_y - odom_.pose.pose.position.y, 2));
+        //     if (distance > clearing_radius_) {
+        //         occupancy_grid_.data[i] = -1;
+        //         log_odds_[i] = 0.0;
+        //     }
+        // }
 
         for (const auto& point : cloud.points) {
             if (point.intensity == 99.0) {
