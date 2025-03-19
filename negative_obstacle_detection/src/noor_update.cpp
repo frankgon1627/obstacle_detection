@@ -153,7 +153,7 @@ private:
             float risk = correspondence[6];
 
             // Filter out nonsensical feature points
-            if (abs(point1.y()) < 1.0 && -4 < point1.x() && point.x() < 0){
+            if (abs(point1.y()) < 1.0 && -4 < point1.x() && point1.x() < 0){
                 continue;
             }
 
