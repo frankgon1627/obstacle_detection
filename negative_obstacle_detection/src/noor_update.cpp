@@ -239,9 +239,9 @@ private:
             }
 
             // if the current_point is outside the costmap, disregard rest of data on this line
-            if (sqrt(pow(current_point[0], 2) + pow(current_point[1], 2)) > occupancy_grid_->info.width * sqrt(2)){
-                break;
-            }
+            //if (sqrt(pow(current_point[0], 2) + pow(current_point[1], 2)) > occupancy_grid_->info.width * sqrt(2)){
+            //    break;
+            //}
 
             double expected_deviation = 2.0 * vdl_[vertical_channels_ - row - 1];
             float deviation = sqrt(pow(current_point[0] - (*last_point)[0], 2) + pow(current_point[1] - (*last_point)[1], 2));
