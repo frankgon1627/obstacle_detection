@@ -71,7 +71,7 @@ private:
         pcl::fromROSMsg(*msg, cloud);
 
         for (double& log_odds : log_odds_) {
-            log_odds *= decay_factor_;
+            log_odds = log_odds * decay_factor_ + decay_bias_;
         }
 
         int robot_x = static_cast<int>((odom_.pose.pose.position.x - occupancy_grid_.info.origin.position.x) / resolution_);
@@ -130,6 +130,7 @@ private:
     int width_ = 100;
     int height_ = 100;
     double decay_factor_ = 0.95;
+    double decay_bias_ = -0.05;
     double occupied_log_odds_ = 0.7;
     double free_log_odds_ = -0.4;
     double clearing_radius_ = 5.0;
