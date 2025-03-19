@@ -79,7 +79,7 @@ private:
         }
 
         try{
-            string from_frame = "os_sensor";
+            string from_frame = "os_lidar";
             string to_frame = occupancy_grid_->header.frame_id;
 
             lidar_to_costmap_transform_ = tf_buffer_.lookupTransform(to_frame, from_frame, tf2::TimePointZero);
@@ -292,7 +292,7 @@ private:
 
     void publish_feature_points(FeaturePoints& feature_points){
         visualization_msgs::msg::Marker marker;
-        marker.header.frame_id = "os_sensor";
+        marker.header.frame_id = "os_lidar";
         marker.header.stamp = this->now();
         marker.ns = "feature_points";
         marker.id = 0;

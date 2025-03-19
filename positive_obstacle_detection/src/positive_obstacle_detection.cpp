@@ -27,7 +27,7 @@ public:
 
 private:
     void initializeOccupancyGrid() {
-        occupancy_grid_.header.frame_id = "map";
+        occupancy_grid_.header.frame_id = "odom";
         occupancy_grid_.info.resolution = resolution_;
         occupancy_grid_.info.width = width_;
         occupancy_grid_.info.height = height_;
