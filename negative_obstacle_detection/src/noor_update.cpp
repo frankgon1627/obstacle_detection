@@ -26,7 +26,7 @@ class NegativeObstacleDetection : public rclcpp::Node
 public:
     NegativeObstacleDetection() : Node("negative_obstacle_detection"), tf_buffer_(this->get_clock()), tf_listener_(tf_buffer_){
         occupancy_grid_subscriber_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
-            "/planners/dialted_occupancy_grid", 10, bind(&NegativeObstacleDetection::occupancy_grid_callback, this, placeholders::_1));
+            "/planners/dialated_occupancy_grid", 10, bind(&NegativeObstacleDetection::occupancy_grid_callback, this, placeholders::_1));
         auto point_cloud_qos = rclcpp::QoS(10);
         point_cloud_qos.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
         point_cloud_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
