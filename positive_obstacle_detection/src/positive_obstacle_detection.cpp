@@ -19,6 +19,7 @@ public:
             "/dlio/odom_node/odom", 10, bind(&PointCloudToGrid::odom_callback, this, placeholders::_1));
         pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/groundgrid/segmented_cloud", 10, bind(&PointCloudToGrid::pointcloud_callback, this, placeholders::_1));
+
         occupancy_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/obstacle_detection/positive_obstacle_grid", 10);
         
