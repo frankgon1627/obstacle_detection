@@ -313,10 +313,10 @@ private:
             marker.points.push_back(p2);
 
             std_msgs::msg::ColorRGBA color;
-            color.a = 225.0;
-            color.r = point[6];
-            color.g = 225.0 - point[6];
-            color.b = 0.0;
+            color.a = 100.0;
+            color.r = 0;
+            color.g = 0;
+            color.b = 255.0;
             marker.colors.push_back(color);
             marker.colors.push_back(color);
         }
