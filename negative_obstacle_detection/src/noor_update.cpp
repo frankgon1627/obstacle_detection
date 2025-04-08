@@ -33,6 +33,7 @@ public:
             "/planners/dialated_occupancy_grid", 10, bind(&NegativeObstacleDetection::occupancy_grid_callback, this, placeholders::_1));
 
         risk_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/planners/risk_map", 10);
+        filtered_risk_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/planners/filtered_risk_map", 10);
         combined_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/planners/combined_map", 10);
         feature_points_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/planners/feature_points", 10);
 
@@ -70,6 +71,9 @@ public:
 private:
     void occupancy_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg){
         occupancy_grid_ = msg;
+        map_height_ = occupancy_grid_->info.height;
+        map_width_ = occupancy_grid_->info.width;
+        map_resolution_ = occupancy_grid_->info.resolution;
     }
 
     void transform_callback(){
@@ -126,15 +130,12 @@ private:
         // extract relevant Occupancy Grid Information
         nav_msgs::msg::MapMetaData map_info = occupancy_grid_->info;
         geometry_msgs::msg::Pose map_origin = map_info.origin;
-        const int map_width = map_info.width;
-        const int map_height = map_info.height;
-        const double map_resolution = map_info.resolution;
 
         // make a risk map and a combined map for publishing
         nav_msgs::msg::OccupancyGrid risk_map;
         risk_map.header = occupancy_grid_->header;
         risk_map.info = map_info;
-        risk_map.data = vector<int8_t>(map_width * map_height, 0);
+        risk_map.data = vector<int8_t>(map_width_ * map_height_, 0);
 
         nav_msgs::msg::OccupancyGrid combined_map;
         combined_map.header = occupancy_grid_->header;
@@ -164,10 +165,10 @@ private:
             float norm = sqrt(pow(point1_cost_frame.x(), 2) + pow(point1_cost_frame.y(), 2));
 
             // determine the 2D index in the cost_map data array
-            int j1 = int((point1_cost_frame.x() - map_origin.position.x) / map_resolution);
-            int i1 = int((point1_cost_frame.y() - map_origin.position.y) / map_resolution);
-            int j2 = int((point2_cost_frame.x() - map_origin.position.x) / map_resolution);
-            int i2 = int((point2_cost_frame.y() - map_origin.position.y) / map_resolution);
+            int j1 = int((point1_cost_frame.x() - map_origin.position.x) / map_resolution_);
+            int i1 = int((point1_cost_frame.y() - map_origin.position.y) / map_resolution_);
+            int j2 = int((point2_cost_frame.x() - map_origin.position.x) / map_resolution_);
+            int i2 = int((point2_cost_frame.y() - map_origin.position.y) / map_resolution_);
 
             vector<pair<int, int>> grid_cells = bresenham_line(i1, j1, i2, j2);
             for (pair<int, int> grid_cell : grid_cells){
@@ -175,19 +176,30 @@ private:
                 int cell_j = grid_cell.second;
 
                 // ensure the cell is within the grid
-                if(0 <= cell_i && cell_i < map_height && 0 <= cell_j && cell_j < map_width){
+                if(0 <= cell_i && cell_i < map_height_ && 0 <= cell_j && cell_j < map_width_){
                     int8_t cell_value = static_cast<int8_t>(min(norm*risk, 100.0f));
                     // set the risk value in the risk map
-                    risk_map.data[cell_i * map_width + cell_j] = cell_value;
-                    // set the combined value in the combined map
-                    if (combined_map.data[cell_i * map_width + cell_j] == 0){
-                        combined_map.data[cell_i * map_width + cell_j] = cell_value;
-                    }
+                    risk_map.data[cell_i * map_width_ + cell_j] = cell_value;
                 }
             }
         }
+        // store the latest risk map and remove the oldest if over max size
+        if (risk_map_deque_.size() >= deque_max_size_){
+            risk_map_deque_.pop_front();
+        }
+        risk_map_deque_.push_back(risk_map);
 
+        // temporally filter over the last N risk maps
+        nav_msgs::msg::OccupancyGrid filtered_risk_map = make_filtered_risk_map();
         risk_map_pub_->publish(risk_map);
+        filtered_risk_map_pub_->publish(filtered_risk_map);
+
+        // make combined risk map
+        for(size_t i=0; i < filtered_risk_map.data.size(); i++){
+            if (combined_map.data[i] == 0){
+                combined_map.data[i] = filtered_risk_map.data[i];
+            }
+        }
         combined_map_pub_->publish(combined_map);
     }
 
@@ -267,6 +279,42 @@ private:
         return feature_points_col;
     }
 
+    nav_msgs::msg::OccupancyGrid make_filtered_risk_map(){
+        nav_msgs::msg::OccupancyGrid filtered_risk_map;
+        filtered_risk_map.header = occupancy_grid_->header;
+        filtered_risk_map.info = occupancy_grid_->info;
+        filtered_risk_map.data = vector<int8_t>(occupancy_grid_->info.width * occupancy_grid_->info.height, 0);
+        double filtered_map_origin_x = filtered_risk_map.info.origin.position.x;
+        double filtered_map_origin_y = filtered_risk_map.info.origin.position.y;
+
+        for(size_t cell_index=0; cell_index < filtered_risk_map.data.size(); cell_index++){
+            // get the 2D position of the current cell
+            int filtered_map_cell_i = cell_index % map_width_;  
+            int filtered_map_cell_j = cell_index / map_height_;   
+            double filtered_map_cell_x = filtered_map_origin_x + (filtered_map_cell_i + 0.5) * map_resolution_;
+            double filtered_map_cell_y = filtered_map_origin_y + (filtered_map_cell_j + 0.5) * map_resolution_;
+
+            // extract the cell_value of all previous maps at the given 2D location
+            int cell_value_accumulation = 0;
+            int maps_included = 0;
+            for(nav_msgs::msg::OccupancyGrid& old_map : risk_map_deque_){
+                geometry_msgs::msg::Pose old_map_origin = old_map.info.origin;
+                int old_map_cell_j = int((filtered_map_cell_x - old_map_origin.position.x) / map_resolution_);
+                int old_map_cell_i = int((filtered_map_cell_y - old_map_origin.position.y) / map_resolution_);
+
+                // add to the accumulated cell value if within bounds
+                if(0 <= old_map_cell_i && old_map_cell_i < map_height_ && 0 <= old_map_cell_j && old_map_cell_j < map_width_){
+                    cell_value_accumulation += old_map.data[old_map_cell_i * map_width_ + old_map_cell_j];
+                    ++maps_included;
+                }
+            }
+
+            // save filtered cell value into filtered risk map
+            filtered_risk_map.data[cell_index] = static_cast<uint8_t>(cell_value_accumulation / maps_included);
+        }  
+        return filtered_risk_map;
+    }
+
     vector<pair<int, int>> bresenham_line(int i1, int j1, int i2, int j2){
         vector<pair<int, int>> points;
         int dx = abs(i2 - i1);
@@ -330,6 +378,7 @@ private:
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr occupancy_grid_subscriber_;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_subscriber_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr risk_map_pub_;
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr filtered_risk_map_pub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr combined_map_pub_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr feature_points_pub_;
     tf2_ros::Buffer tf_buffer_;
@@ -338,7 +387,12 @@ private:
 
     // Obstacle map variables
     nav_msgs::msg::OccupancyGrid::SharedPtr occupancy_grid_;
+    int map_height_;
+    int map_width_;
+    double map_resolution_;
     geometry_msgs::msg::TransformStamped lidar_to_costmap_transform_;
+    deque<nav_msgs::msg::OccupancyGrid> risk_map_deque_;
+    long unsigned int deque_max_size_ = 30;
 
     // LIDAR geometry variables
     const double lidar_height_ = 0.4082;
