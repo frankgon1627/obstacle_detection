@@ -23,24 +23,24 @@ constexpr size_t horizontal_channels_ = 1024;
 
 namespace obstacle_detection{
 
-class NegativeObstacleDetection : public rclcpp::Node
+class NegativeObstacleDetectionNode : public rclcpp::Node
 {
 public:
-    NegativeObstacleDetection(const rclcpp::NodeOptions & options) : 
+    NegativeObstacleDetectionNode(const rclcpp::NodeOptions & options) : 
     Node("negative_obstacle_detection", options), tf_buffer_(this->get_clock()), tf_listener_(tf_buffer_){
         auto point_cloud_qos = rclcpp::QoS(10);
         point_cloud_qos.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
         point_cloud_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/ouster/points", point_cloud_qos, bind(&NegativeObstacleDetection::point_cloud_callback, this, placeholders::_1));
+            "/ouster/points", point_cloud_qos, bind(&NegativeObstacleDetectionNode::point_cloud_callback, this, placeholders::_1));
         occupancy_grid_subscriber_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
-            "/planners/dialated_occupancy_grid", 10, bind(&NegativeObstacleDetection::occupancy_grid_callback, this, placeholders::_1));
+            "/planners/dialated_occupancy_grid", 10, bind(&NegativeObstacleDetectionNode::occupancy_grid_callback, this, placeholders::_1));
 
         risk_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/planners/risk_map", 10);
         filtered_risk_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/planners/filtered_risk_map", 10);
         combined_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/planners/combined_map", 10);
         feature_points_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/planners/feature_points", 10);
 
-        timer_ = this->create_wall_timer(chrono::milliseconds(100), bind(&NegativeObstacleDetection::transform_callback, this));
+        timer_ = this->create_wall_timer(chrono::milliseconds(100), bind(&NegativeObstacleDetectionNode::transform_callback, this));
 
         // initialize relevant LIDAR geometry arrays
         vertical_angles_ = {16.349001, 15.750999, 15.181001, 14.645001, 14.171, 13.595, 13.043,
@@ -407,4 +407,4 @@ private:
 }
 
 #include <rclcpp_components/register_node_macro.hpp>
-RCLCPP_COMPONENTS_REGISTER_NODE(obstacle_detection::NegativeObstacleDetection)
+RCLCPP_COMPONENTS_REGISTER_NODE(obstacle_detection::NegativeObstacleDetectionNode)

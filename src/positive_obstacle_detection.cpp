@@ -10,13 +10,13 @@ using namespace std;
 
 namespace obstacle_detection{
 
-class PositiveObstacleDetection : public rclcpp::Node {
+class PositiveObstacleDetectionNode : public rclcpp::Node {
 public:
-    PositiveObstacleDetection(const rclcpp::NodeOptions & options) : Node("pointcloud_to_grid", options) {
+    PositiveObstacleDetectionNode(const rclcpp::NodeOptions & options) : Node("pointcloud_to_grid", options) {
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            "/dlio/odom_node/odom", 10, bind(&PositiveObstacleDetection::odom_callback, this, placeholders::_1));
+            "/dlio/odom_node/odom", 10, bind(&PositiveObstacleDetectionNode::odom_callback, this, placeholders::_1));
         pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/groundgrid/segmented_cloud", 10, bind(&PositiveObstacleDetection::pointcloud_callback, this, placeholders::_1));
+            "/groundgrid/segmented_cloud", 10, bind(&PositiveObstacleDetectionNode::pointcloud_callback, this, placeholders::_1));
 
         occupancy_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/obstacle_detection/positive_obstacle_grid", 10);
@@ -90,4 +90,4 @@ private:
 }
 
 #include <rclcpp_components/register_node_macro.hpp>
-RCLCPP_COMPONENTS_REGISTER_NODE(obstacle_detection::PositiveObstacleDetection)
+RCLCPP_COMPONENTS_REGISTER_NODE(obstacle_detection::PositiveObstacleDetectionNode)

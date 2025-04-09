@@ -35,13 +35,13 @@ ament_target_dependencies(obstacle_detection_container
 
 rclcpp_components_register_node(
     obstacle_detection_container
-    PLUGIN "obstacle_detection::PositiveObstacleDetection"
+    PLUGIN "obstacle_detection::PositiveObstacleDetectionNode"
     EXECUTABLE positive_obstacle_detection_node
 )
 
 rclcpp_components_register_node(
     obstacle_detection_container
-    PLUGIN "obstacle_detection::NegativeObstacleDetection"
+    PLUGIN "obstacle_detection::NegativeObstacleDetectionNode"
     EXECUTABLE negative_obstacle_detection_node
 )
 
