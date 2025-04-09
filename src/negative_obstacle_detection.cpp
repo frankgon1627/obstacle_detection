@@ -21,10 +21,13 @@ using FeaturePoints = vector<array<float, 7>>;
 constexpr size_t vertical_channels_ = 64;
 constexpr size_t horizontal_channels_ = 1024;
 
+namespace obstacle_detection{
+
 class NegativeObstacleDetection : public rclcpp::Node
 {
 public:
-    NegativeObstacleDetection() : Node("negative_obstacle_detection"), tf_buffer_(this->get_clock()), tf_listener_(tf_buffer_){
+    NegativeObstacleDetection(const rclcpp::NodeOptions & options) : 
+    Node("negative_obstacle_detection", options), tf_buffer_(this->get_clock()), tf_listener_(tf_buffer_){
         auto point_cloud_qos = rclcpp::QoS(10);
         point_cloud_qos.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
         point_cloud_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -401,11 +404,7 @@ private:
     array<double, 64> rho_i_;
     array<double, 64> vdl_;
 };
-
-int main(int argc, char **argv)
-{
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<NegativeObstacleDetection>());
-    rclcpp::shutdown();
-    return 0;
 }
+
+#include <rclcpp_components/register_node_macro.hpp>
+RCLCPP_COMPONENTS_REGISTER_NODE(obstacle_detection::NegativeObstacleDetection)

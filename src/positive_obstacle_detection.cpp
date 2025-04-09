@@ -1,24 +1,22 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
-#include <geometry_msgs/msg/point_stamped.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <tf2_ros/transform_listener.h>
-#include <tf2_ros/buffer.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 using namespace std;
 
-class PointCloudToGrid : public rclcpp::Node {
+namespace obstacle_detection{
+
+class PositiveObstacleDetection : public rclcpp::Node {
 public:
-    PointCloudToGrid() : Node("pointcloud_to_grid") {
+    PositiveObstacleDetection(const rclcpp::NodeOptions & options) : Node("pointcloud_to_grid", options) {
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            "/dlio/odom_node/odom", 10, bind(&PointCloudToGrid::odom_callback, this, placeholders::_1));
+            "/dlio/odom_node/odom", 10, bind(&PositiveObstacleDetection::odom_callback, this, placeholders::_1));
         pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/groundgrid/segmented_cloud", 10, bind(&PointCloudToGrid::pointcloud_callback, this, placeholders::_1));
+            "/groundgrid/segmented_cloud", 10, bind(&PositiveObstacleDetection::pointcloud_callback, this, placeholders::_1));
 
         occupancy_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/obstacle_detection/positive_obstacle_grid", 10);
@@ -89,10 +87,7 @@ private:
     int width_ = 100;
     int height_ = 100;
 };
-
-int main(int argc, char **argv) {
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<PointCloudToGrid>());
-    rclcpp::shutdown();
-    return 0;
 }
+
+#include <rclcpp_components/register_node_macro.hpp>
+RCLCPP_COMPONENTS_REGISTER_NODE(obstacle_detection::PositiveObstacleDetection)
