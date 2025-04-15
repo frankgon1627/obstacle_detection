@@ -13,6 +13,7 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(OpenCV REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(pcl_ros REQUIRED)
@@ -31,6 +32,7 @@ ament_target_dependencies(obstacle_detection_container
     tf2_ros
     tf2_geometry_msgs
     visualization_msgs
+    OpenCV
 )
 
 rclcpp_components_register_node(
@@ -55,7 +57,8 @@ ament_export_dependencies(
     pcl_ros 
     tf2_ros 
     tf2_geometry_msgs
-    visualization_msgs)
+    visualization_msgs
+    OpenCV)
 ament_package()
 
 install(

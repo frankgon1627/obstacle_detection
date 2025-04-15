@@ -5,6 +5,8 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <opencv2/opencv.hpp>
+#include <cmath>
 
 using namespace std;
 
@@ -20,6 +22,8 @@ public:
 
         occupancy_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/obstacle_detection/positive_obstacle_grid", 10);
+        dialated_occupancy_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
+            "/obstacle_detection/dialated_positive_obstacle_grid", 10);
         
         initializeOccupancyGrid();
     }
@@ -59,7 +63,7 @@ private:
                     continue;
                 }
                 // ignore any points that are well above the Jackal
-                if (point.z - odom_.pose.pose.position.z > 0.75){
+                if (point.z - odom_.pose.pose.position.z> 0.75){
                     continue;
                 }
 
@@ -75,17 +79,50 @@ private:
         occupancy_grid_.header.stamp = this->now();
         occupancy_grid_pub_->publish(occupancy_grid_);
         RCLCPP_INFO(this->get_logger(), "Published Positive Occupancy Grid");
+
+        nav_msgs::msg::OccupancyGrid dialated_occupancy_grid = dialate_occupancy_grid();
+        dialated_occupancy_grid_pub_->publish(dialated_occupancy_grid);
+        RCLCPP_INFO(this->get_logger(), "Published dialated Positive Occupancy Grid");
+    }
+
+    nav_msgs::msg::OccupancyGrid dialate_occupancy_grid(){
+        // initialize relevant data
+        nav_msgs::msg::OccupancyGrid dialated_occupancy_grid;
+        dialated_occupancy_grid.header.stamp = occupancy_grid_.header.stamp;
+        dialated_occupancy_grid.info = occupancy_grid_.info;
+        dialated_occupancy_grid.data = occupancy_grid_.data;
+
+        cv::Mat grid_map(height_, width_, CV_8UC1, const_cast<int8_t*>(dialated_occupancy_grid.data.data()));
+        cv::Mat obstacle_mask = (grid_map == 100);
+
+        int expansion_pixels = static_cast<int>(std::ceil(dialation_meters_ / resolution_));
+        int kernel_size = 2 * expansion_pixels + 1;
+        cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(kernel_size, kernel_size));
+        cv::Mat dilated_mask;
+        cv::dilate(obstacle_mask, dilated_mask, kernel);
+
+        for (int y = 0; y < height_; ++y) {
+            for (int x = 0; x < width_; ++x) {
+                if (dilated_mask.at<uint8_t>(y, x)) {
+                    dialated_occupancy_grid.data[y * width_ + x] = 100;
+                }
+            }
+        }
+
+        return dialated_occupancy_grid;
     }
 
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occupancy_grid_pub_;
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr dialated_occupancy_grid_pub_;
 
     nav_msgs::msg::Odometry odom_;
     nav_msgs::msg::OccupancyGrid occupancy_grid_;
     double resolution_ = 0.2;
     int width_ = 100;
     int height_ = 100;
+    double dialation_meters_ = 0.75;
 };
 }
 
