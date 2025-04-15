@@ -12,7 +12,7 @@ namespace obstacle_detection{
 
 class PositiveObstacleDetectionNode : public rclcpp::Node {
 public:
-    PositiveObstacleDetectionNode(const rclcpp::NodeOptions & options) : Node("pointcloud_to_grid", options) {
+    PositiveObstacleDetectionNode(const rclcpp::NodeOptions & options) : Node("pointcloud_to_grid", options){
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
             "/dlio/odom_node/odom", 10, bind(&PositiveObstacleDetectionNode::odom_callback, this, placeholders::_1));
         pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -59,7 +59,7 @@ private:
                     continue;
                 }
                 // ignore any points that are well above the Jackal
-                if (point.z > 0.75){
+                if (point.z - odom_.pose.pose.position.z > 0.75){
                     continue;
                 }
 
