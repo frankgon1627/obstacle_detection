@@ -82,7 +82,7 @@ private:
 
         nav_msgs::msg::OccupancyGrid dialated_occupancy_grid = dialate_occupancy_grid();
         dialated_occupancy_grid_pub_->publish(dialated_occupancy_grid);
-        RCLCPP_INFO(this->get_logger(), "Published dialated Positive Occupancy Grid");
+        RCLCPP_INFO(this->get_logger(), "Published Dialated Positive Occupancy Grid");
     }
 
     nav_msgs::msg::OccupancyGrid dialate_occupancy_grid(){
