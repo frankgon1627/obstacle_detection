@@ -20,9 +20,9 @@ public:
         pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/groundgrid/segmented_cloud", 10, bind(&PositiveObstacleDetectionNode::pointcloud_callback, this, placeholders::_1));
 
-        occupancy_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
+        positive_obstacle_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/obstacle_detection/positive_obstacle_grid", 10);
-        dialated_occupancy_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
+        dialated_positive_obstacle_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/obstacle_detection/dialated_positive_obstacle_grid", 10);
         
         initializeOccupancyGrid();
@@ -30,21 +30,21 @@ public:
 
 private:
     void initializeOccupancyGrid() {
-        occupancy_grid_.header.frame_id = "odom";
-        occupancy_grid_.info.resolution = resolution_;
-        occupancy_grid_.info.width = width_;
-        occupancy_grid_.info.height = height_;
-        occupancy_grid_.info.origin.position.x = -static_cast<double>(width_) * resolution_ / 2.0;
-        occupancy_grid_.info.origin.position.y = -static_cast<double>(height_) * resolution_ / 2.0;
-        occupancy_grid_.info.origin.position.z = 0.0;
-        occupancy_grid_.info.origin.orientation.w = 1.0;
-        occupancy_grid_.data.resize(width_ * height_, -1); 
+        positive_obstacle_grid_.header.frame_id = "odom";
+        positive_obstacle_grid_.info.resolution = resolution_;
+        positive_obstacle_grid_.info.width = width_;
+        positive_obstacle_grid_.info.height = height_;
+        positive_obstacle_grid_.info.origin.position.x = -static_cast<double>(width_) * resolution_ / 2.0;
+        positive_obstacle_grid_.info.origin.position.y = -static_cast<double>(height_) * resolution_ / 2.0;
+        positive_obstacle_grid_.info.origin.position.z = 0.0;
+        positive_obstacle_grid_.info.origin.orientation.w = 1.0;
+        positive_obstacle_grid_.data.resize(width_ * height_, -1); 
     }
 
     void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
         odom_ = *msg;
-        occupancy_grid_.info.origin.position.x = odom_.pose.pose.position.x - static_cast<double>(width_) * resolution_ / 2.0;
-        occupancy_grid_.info.origin.position.y = odom_.pose.pose.position.y - static_cast<double>(height_) * resolution_ / 2.0;
+        positive_obstacle_grid_.info.origin.position.x = odom_.pose.pose.position.x - static_cast<double>(width_) * resolution_ / 2.0;
+        positive_obstacle_grid_.info.origin.position.y = odom_.pose.pose.position.y - static_cast<double>(height_) * resolution_ / 2.0;
         RCLCPP_INFO(this->get_logger(), "Got Odometry and Updated Map position");
     }
 
@@ -53,7 +53,7 @@ private:
         pcl::fromROSMsg(*msg, cloud);
 
         // Reset grid
-        fill(occupancy_grid_.data.begin(), occupancy_grid_.data.end(), 0);
+        fill(positive_obstacle_grid_.data.begin(), positive_obstacle_grid_.data.end(), 0);
 
         for (const auto& point : cloud.points) {
             // insensity value indicating non-ground point
@@ -67,30 +67,30 @@ private:
                     continue;
                 }
 
-                int grid_x = static_cast<int>((point.x - occupancy_grid_.info.origin.position.x) / resolution_);
-                int grid_y = static_cast<int>((point.y - occupancy_grid_.info.origin.position.y) / resolution_);
+                int grid_x = static_cast<int>((point.x - positive_obstacle_grid_.info.origin.position.x) / resolution_);
+                int grid_y = static_cast<int>((point.y - positive_obstacle_grid_.info.origin.position.y) / resolution_);
                 
                 if (grid_x >= 0 && grid_x < width_ && grid_y >= 0 && grid_y < height_) {
-                    occupancy_grid_.data[grid_y * width_ + grid_x] = 100; 
+                    positive_obstacle_grid_.data[grid_y * width_ + grid_x] = 100; 
                 }
             }
         }
 
-        occupancy_grid_.header.stamp = this->now();
-        occupancy_grid_pub_->publish(occupancy_grid_);
+        positive_obstacle_grid_.header.stamp = this->now();
+        positive_obstacle_grid_pub_->publish(positive_obstacle_grid_);
         RCLCPP_INFO(this->get_logger(), "Published Positive Occupancy Grid");
 
         nav_msgs::msg::OccupancyGrid dialated_occupancy_grid = dialate_occupancy_grid();
-        dialated_occupancy_grid_pub_->publish(dialated_occupancy_grid);
+        dialated_positive_obstacle_grid_pub_->publish(dialated_occupancy_grid);
         RCLCPP_INFO(this->get_logger(), "Published Dialated Positive Occupancy Grid");
     }
 
     nav_msgs::msg::OccupancyGrid dialate_occupancy_grid(){
         // initialize relevant data
         nav_msgs::msg::OccupancyGrid dialated_occupancy_grid;
-        dialated_occupancy_grid.header.stamp = occupancy_grid_.header.stamp;
-        dialated_occupancy_grid.info = occupancy_grid_.info;
-        dialated_occupancy_grid.data = occupancy_grid_.data;
+        dialated_occupancy_grid.header.stamp = positive_obstacle_grid_.header.stamp;
+        dialated_occupancy_grid.info = positive_obstacle_grid_.info;
+        dialated_occupancy_grid.data = positive_obstacle_grid_.data;
 
         cv::Mat grid_map(height_, width_, CV_8UC1, const_cast<int8_t*>(dialated_occupancy_grid.data.data()));
         cv::Mat obstacle_mask = (grid_map == 100);
@@ -114,11 +114,11 @@ private:
 
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
-    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occupancy_grid_pub_;
-    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr dialated_occupancy_grid_pub_;
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr positive_obstacle_grid_pub_;
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr dialated_positive_obstacle_grid_pub_;
 
     nav_msgs::msg::Odometry odom_;
-    nav_msgs::msg::OccupancyGrid occupancy_grid_;
+    nav_msgs::msg::OccupancyGrid positive_obstacle_grid_;
     double resolution_ = 0.2;
     int width_ = 100;
     int height_ = 100;
