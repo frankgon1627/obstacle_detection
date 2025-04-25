@@ -80,19 +80,19 @@ private:
         positive_obstacle_grid_pub_->publish(positive_obstacle_grid_);
         RCLCPP_INFO(this->get_logger(), "Published Positive Occupancy Grid");
 
-        nav_msgs::msg::OccupancyGrid dialated_occupancy_grid = dialate_occupancy_grid();
-        dialated_positive_obstacle_grid_pub_->publish(dialated_occupancy_grid);
+        nav_msgs::msg::OccupancyGrid dialated_positive_obstacle_grid = dialate_occupancy_grid();
+        dialated_positive_obstacle_grid_pub_->publish(dialated_positive_obstacle_grid);
         RCLCPP_INFO(this->get_logger(), "Published Dialated Positive Occupancy Grid");
     }
 
     nav_msgs::msg::OccupancyGrid dialate_occupancy_grid(){
         // initialize relevant data
-        nav_msgs::msg::OccupancyGrid dialated_occupancy_grid;
-        dialated_occupancy_grid.header.stamp = positive_obstacle_grid_.header.stamp;
-        dialated_occupancy_grid.info = positive_obstacle_grid_.info;
-        dialated_occupancy_grid.data = positive_obstacle_grid_.data;
+        nav_msgs::msg::OccupancyGrid dialated_positive_obstacle_grid;
+        dialated_positive_obstacle_grid.header.stamp = positive_obstacle_grid_.header.stamp;
+        dialated_positive_obstacle_grid.info = positive_obstacle_grid_.info;
+        dialated_positive_obstacle_grid.data = positive_obstacle_grid_.data;
 
-        cv::Mat grid_map(height_, width_, CV_8UC1, const_cast<int8_t*>(dialated_occupancy_grid.data.data()));
+        cv::Mat grid_map(height_, width_, CV_8UC1, const_cast<int8_t*>(dialated_positive_obstacle_grid.data.data()));
         cv::Mat obstacle_mask = (grid_map == 100);
 
         int expansion_pixels = static_cast<int>(std::ceil(dialation_meters_ / resolution_));
@@ -104,12 +104,12 @@ private:
         for (int y = 0; y < height_; ++y) {
             for (int x = 0; x < width_; ++x) {
                 if (dilated_mask.at<uint8_t>(y, x)) {
-                    dialated_occupancy_grid.data[y * width_ + x] = 100;
+                    dialated_positive_obstacle_grid.data[y * width_ + x] = 100;
                 }
             }
         }
 
-        return dialated_occupancy_grid;
+        return dialated_positive_obstacle_grid;
     }
 
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
