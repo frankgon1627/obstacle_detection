@@ -33,7 +33,7 @@ public:
         point_cloud_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/ouster/points", point_cloud_qos, bind(&NegativeObstacleDetectionNode::point_cloud_callback, this, placeholders::_1));
         occupancy_grid_subscriber_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
-            "/obstacle_detection/dialated_positive_obstacle_grid", 10, bind(&NegativeObstacleDetectionNode::occupancy_grid_callback, this, placeholders::_1));
+            "/obstacle_detection/dilated_positive_obstacle_grid", 10, bind(&NegativeObstacleDetectionNode::occupancy_grid_callback, this, placeholders::_1));
 
         risk_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/planners/risk_map", 10);
         filtered_risk_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/planners/filtered_risk_map", 10);
