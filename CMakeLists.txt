@@ -13,8 +13,9 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
-find_package(OpenCV REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(custom_msgs_pkg REQUIRED)
+find_package(OpenCV REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(pcl_ros REQUIRED)
 find_package(tf2_ros REQUIRED)
@@ -27,11 +28,12 @@ ament_target_dependencies(obstacle_detection_container
     sensor_msgs
     nav_msgs
     geometry_msgs
+    visualization_msgs
+    custom_msgs_pkg
     pcl_conversions
     pcl_ros
     tf2_ros
     tf2_geometry_msgs
-    visualization_msgs
     OpenCV
 )
 
@@ -53,11 +55,12 @@ ament_export_dependencies(
     sensor_msgs 
     nav_msgs 
     geometry_msgs 
+    visualization_msgs
+    custom_msgs_pkg
     pcl_conversions 
     pcl_ros 
     tf2_ros 
     tf2_geometry_msgs
-    visualization_msgs
     OpenCV)
 ament_package()
 
@@ -66,7 +69,7 @@ install(
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
-  )
+)
 
 install(DIRECTORY launch
     DESTINATION share/${PROJECT_NAME} 
