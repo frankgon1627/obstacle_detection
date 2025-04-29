@@ -86,7 +86,6 @@ private:
 
         // for each cluster, popoulate the occupancy_grid
         for (const pcl::PointIndices& indicies : cluster_indices){
-            pcl::ConvexHull<pcl::PointXYZI> convex_hull;
             pcl::PointCloud<pcl::PointXYZI>::Ptr cluster_cloud(new pcl::PointCloud<pcl::PointXYZI>);
             pcl::PointCloud<pcl::PointXYZI>::Ptr hull(new pcl::PointCloud<pcl::PointXYZI>);
             for (int index: indicies.indices){

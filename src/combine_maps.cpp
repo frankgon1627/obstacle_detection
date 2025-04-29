@@ -55,12 +55,9 @@ private:
         }
 
         // extract relevant Occupancy Grid Information
-        nav_msgs::msg::MapMetaData map_info = dilated_positive_obstacle_grid_->info;
-        geometry_msgs::msg::Pose map_origin = map_info.origin;
-
         nav_msgs::msg::OccupancyGrid combined_map;
         combined_map.header = dilated_positive_obstacle_grid_->header;
-        combined_map.info = map_info;
+        combined_map.info = dilated_positive_obstacle_grid_->info;;
         combined_map.data = dilated_positive_obstacle_grid_->data;
 
         // make combined risk map
