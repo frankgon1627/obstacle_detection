@@ -60,7 +60,7 @@ private:
         RCLCPP_INFO(this->get_logger(), "Segmented Cloud Size, %ld", cloud.size());
 
         // collect valid points
-        pcl::PointCloud<pcl::PointXYZI>::Ptr valid_points(new pcl::PointCloud<pcl::PointXYZI>);
+        pcl::PointCloud<pcl::PointXYZI>::Ptr valid_points = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
         for (const pcl::PointXYZI& point : cloud.points){
             double xy_distance = sqrt(pow(point.x - odom_.pose.pose.position.x, 2) + pow(point.y - odom_.pose.pose.position.y, 2));
             double z_distance = point.z - odom_.pose.pose.position.z;
@@ -70,7 +70,7 @@ private:
         }
 
         // cluster valid points
-        pcl::search::KdTree<pcl::PointXYZI>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZI>);
+        pcl::search::KdTree<pcl::PointXYZI>::Ptr tree = std::make_shared<pcl::search::KdTree<pcl::PointXYZI>>();
         tree->setInputCloud(valid_points);
         std::vector<pcl::PointIndices> cluster_indices;
         pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
@@ -80,14 +80,12 @@ private:
         ec.setSearchMethod(tree);
         ec.setInputCloud(valid_points);
         ec.extract(cluster_indices);
-
+        
         // Reset grid
         fill(positive_obstacle_grid_.data.begin(), positive_obstacle_grid_.data.end(), 0);
 
         // for each cluster, popoulate the occupancy_grid
         for (const pcl::PointIndices& indicies : cluster_indices){
-            pcl::PointCloud<pcl::PointXYZI>::Ptr cluster_cloud(new pcl::PointCloud<pcl::PointXYZI>);
-            pcl::PointCloud<pcl::PointXYZI>::Ptr hull(new pcl::PointCloud<pcl::PointXYZI>);
             for (int index: indicies.indices){
                 pcl::PointXYZI point = valid_points->points[index];
 
