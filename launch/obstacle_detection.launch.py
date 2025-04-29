@@ -25,6 +25,11 @@ def generate_launch_description():
                 package="obstacle_detection",
                 plugin="obstacle_detection::NegativeObstacleDetectionNode",
                 name="negative_obstacle_detection",
+            ),
+            ComposableNode(
+                package="obstacle_detection",
+                plugin="obstacle_detection::CombinerNode",
+                name="combiner_node",
             )
         ]
     )

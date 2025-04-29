@@ -21,7 +21,7 @@ find_package(pcl_ros REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 
-add_library(obstacle_detection_container SHARED src/positive_obstacle_detection.cpp src/negative_obstacle_detection.cpp)
+add_library(obstacle_detection_container SHARED src/positive_obstacle_detection.cpp src/negative_obstacle_detection.cpp src/combine_maps.cpp)
 ament_target_dependencies(obstacle_detection_container 
     rclcpp 
     std_msgs
@@ -47,6 +47,12 @@ rclcpp_components_register_node(
     obstacle_detection_container
     PLUGIN "obstacle_detection::NegativeObstacleDetectionNode"
     EXECUTABLE negative_obstacle_detection_node
+)
+
+rclcpp_components_register_node(
+    obstacle_detection_container
+    PLUGIN "obstacle_detection::CombinerNode"
+    EXECUTABLE combiner_node
 )
 
 ament_export_dependencies(

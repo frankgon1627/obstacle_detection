@@ -1,11 +1,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
-#include <geometry_msgs/msg/point.hpp>
-#include <geometry_msgs/msg/point32.hpp>
-#include <geometry_msgs/msg/polygon.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <nav_msgs/msg/odometry.hpp>
-#include <custom_msgs_pkg/msg/polygon_array.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 #include <pcl_conversions/pcl_conversions.h>
@@ -13,7 +9,6 @@
 #include <pcl/point_types.h>
 #include <pcl/search/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
-#include <pcl/surface/convex_hull.h>
 #include <opencv2/opencv.hpp>
 #include <cmath>
 
@@ -33,10 +28,6 @@ public:
             "/obstacle_detection/positive_obstacle_grid", 10);
         dilated_positive_obstacle_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/obstacle_detection/dilated_positive_obstacle_grid", 10);
-        convex_hull_publisher_ = this->create_publisher<custom_msgs_pkg::msg::PolygonArray>(
-            "/convex_hulls", 10);
-        convex_hull_viz_publisher_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
-            "/convex_hulls_viz", 10);
         
         initializeOccupancyGrid();
     }
@@ -93,8 +84,7 @@ private:
         // Reset grid
         fill(positive_obstacle_grid_.data.begin(), positive_obstacle_grid_.data.end(), 0);
 
-        // for each cluster, popoulate the occupancy_grid and make a convex hull for it
-        vector<pcl::PointCloud<pcl::PointXYZI>> convex_hulls;
+        // for each cluster, popoulate the occupancy_grid
         for (const pcl::PointIndices& indicies : cluster_indices){
             pcl::ConvexHull<pcl::PointXYZI> convex_hull;
             pcl::PointCloud<pcl::PointXYZI>::Ptr cluster_cloud(new pcl::PointCloud<pcl::PointXYZI>);
@@ -111,13 +101,7 @@ private:
 
                 cluster_cloud->push_back(point);
             }
-            convex_hull.setInputCloud(cluster_cloud);
-            convex_hull.setDimension(2);
-            convex_hull.reconstruct(*hull);          
-            convex_hulls.push_back(*hull);
         }
-
-        publish_convex_hulls(convex_hulls);
 
         positive_obstacle_grid_.header.stamp = this->now();
         positive_obstacle_grid_pub_->publish(positive_obstacle_grid_);
@@ -155,59 +139,10 @@ private:
         return dilated_positive_obstacle_grid;
     }
 
-    void publish_convex_hulls(vector<pcl::PointCloud<pcl::PointXYZI>>& convex_hulls){
-        custom_msgs_pkg::msg::PolygonArray polygon_array;
-        visualization_msgs::msg::MarkerArray marker_array;
-
-        for (size_t i=0; i < convex_hulls.size(); i++){
-            geometry_msgs::msg::Polygon polygon;
-
-            visualization_msgs::msg::Marker marker;
-            marker.header.frame_id = "odom";
-            marker.header.stamp = this->now();
-            marker.ns = "convex_hulls";
-            marker.id = i;
-            marker.type = marker.LINE_STRIP;
-            marker.action = marker.ADD;
-            marker.scale.x = 0.1;
-            marker.scale.y = 0.1;
-            marker.color.r = 1.0;
-            marker.color.g = 0.0;
-            marker.color.b = 0.0;
-            marker.color.a = 1.0;
-            
-            for (pcl::PointXYZI& vertex : convex_hulls[i].points){
-                geometry_msgs::msg::Point32 point32;
-                point32.x = vertex.x;
-                point32.y = vertex.y;
-                polygon.points.push_back(point32);
-
-                geometry_msgs::msg::Point point;
-                point.x = vertex.x;
-                point.y = vertex.y;
-                point.z = odom_.pose.pose.position.z + 0.05;
-                marker.points.push_back(point);
-            }
-            polygon_array.polygons.push_back(polygon);
-
-            if (convex_hulls[i].size() > 0){
-                geometry_msgs::msg::Point first_point;
-                marker.points.push_back(marker.points[0]);
-            }
-
-            marker_array.markers.push_back(marker);
-        }
-
-        convex_hull_publisher_->publish(polygon_array);
-        convex_hull_viz_publisher_->publish(marker_array);
-    }
-
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr positive_obstacle_grid_pub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr dilated_positive_obstacle_grid_pub_;
-    rclcpp::Publisher<custom_msgs_pkg::msg::PolygonArray>::SharedPtr convex_hull_publisher_;
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr convex_hull_viz_publisher_;
 
     nav_msgs::msg::Odometry odom_;
     nav_msgs::msg::OccupancyGrid positive_obstacle_grid_;
