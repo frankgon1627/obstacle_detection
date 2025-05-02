@@ -95,8 +95,6 @@ private:
                 if (grid_x >= 0 && grid_x < width_ && grid_y >= 0 && grid_y < height_) {
                     positive_obstacle_grid_.data[grid_y * width_ + grid_x] = 100; 
                 }
-
-                cluster_cloud->push_back(point);
             }
         }
 
