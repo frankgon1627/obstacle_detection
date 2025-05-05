@@ -66,7 +66,10 @@ private:
                 combined_map.data[i] = filtered_grid_->data[i];
             }
         }
-        combined_map_pub_->publish(combined_map);
+        if (combined_map_pub_->get_subscription_count() > 0){
+            combined_map_pub_->publish(combined_map);
+        }
+        RCLCPP_INFO(this->get_logger(), "Published Combined Risk Map.");
     }
 
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr dilated_positive_obstacle_grid_subscriber_;

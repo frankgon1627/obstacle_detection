@@ -57,8 +57,6 @@ private:
         pcl::PointCloud<pcl::PointXYZI> cloud;
         pcl::fromROSMsg(*msg, cloud);
 
-        RCLCPP_INFO(this->get_logger(), "Segmented Cloud Size, %ld", cloud.size());
-
         // collect valid points
         pcl::PointCloud<pcl::PointXYZI>::Ptr valid_points = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
         for (const pcl::PointXYZI& point : cloud.points){
@@ -99,12 +97,16 @@ private:
         }
 
         positive_obstacle_grid_.header.stamp = this->now();
-        positive_obstacle_grid_pub_->publish(positive_obstacle_grid_);
-        RCLCPP_INFO(this->get_logger(), "Published Positive Occupancy Grid");
+        if (positive_obstacle_grid_pub_->get_subscription_count() > 0){
+            positive_obstacle_grid_pub_->publish(positive_obstacle_grid_);
+        }
 
         nav_msgs::msg::OccupancyGrid dilated_positive_obstacle_grid = dialate_occupancy_grid();
-        dilated_positive_obstacle_grid_pub_->publish(dilated_positive_obstacle_grid);
-        RCLCPP_INFO(this->get_logger(), "Published Dialated Positive Occupancy Grid");
+        if (dilated_positive_obstacle_grid_pub_->get_subscription_count() > 0){
+            dilated_positive_obstacle_grid_pub_->publish(dilated_positive_obstacle_grid);
+        }
+
+        RCLCPP_INFO(this->get_logger(), "Published Positive and Dialated Occupancy Grid");
     }
 
     nav_msgs::msg::OccupancyGrid dialate_occupancy_grid(){
