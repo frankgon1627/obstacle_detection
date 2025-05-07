@@ -40,8 +40,8 @@ public:
 private:
     void dilated_positive_obstacle_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg){
         dilated_positive_obstacle_grid_ = msg;
-        map_height_ = dilated_positive_obstacle_grid_->info.height;
-        map_width_ = dilated_positive_obstacle_grid_->info.width;
+        height_ = dilated_positive_obstacle_grid_->info.height;
+        width_ = dilated_positive_obstacle_grid_->info.width;
         map_resolution_ = dilated_positive_obstacle_grid_->info.resolution;
     }
 
@@ -79,8 +79,8 @@ private:
     // Obstacle map variables
     nav_msgs::msg::OccupancyGrid::SharedPtr dilated_positive_obstacle_grid_;
     nav_msgs::msg::OccupancyGrid::SharedPtr filtered_grid_;
-    int map_height_;
-    int map_width_;
+    int height_;
+    int width_;
     double map_resolution_;
 };
 }
