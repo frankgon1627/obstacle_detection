@@ -39,7 +39,6 @@ public:
         risk_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/obstacle_detection/risk_map", 10);
         averaged_risk_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/obstacle_detection/averaged_risk_map", 10);
         blurred_risk_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/obstacle_detection/blurred_risk_map", 10);
-        combined_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/obstacle_detection/combined_map", 10);
         feature_points_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/obstacle_detection/feature_points", 10);
 
         timer_ = this->create_wall_timer(chrono::milliseconds(100), bind(&NegativeObstacleDetectionNode::transform_callback, this));
@@ -199,7 +198,7 @@ private:
         if (averaged_risk_map_pub_->get_subscription_count() > 0){
             averaged_risk_map_pub_->publish(averaged_risk_map);
         }
-        
+
         // Convert to OpenCV image to apply gaussian blurring
         cv::Mat averaged_risk_map_image(height_, width_, CV_8UC1);
         for(int j = 0; j < height_; ++j){
@@ -212,9 +211,10 @@ private:
         cv::GaussianBlur(averaged_risk_map_image, averaged_risk_map_image, cv::Size(5, 5), 1.0);
 
         // convert back into occupancy grid and publish the blurred occupancy grid
-        nav_msgs::msg::OccupancyGrid blurred_risk_map;
+        nav_msgs::msg::OccupancyGrid blurred_risk_map = nav_msgs::msg::OccupancyGrid();
         blurred_risk_map.header = occupancy_grid_->header;
         blurred_risk_map.info = map_info;
+        blurred_risk_map.data = vector<int8_t>(width_ * height_, 0);
         for(int j = 0; j < height_; ++j){
             for(int i = 0; i < width_; ++i){
                 int idx = j * width_ + i;
@@ -225,20 +225,7 @@ private:
             blurred_risk_map_pub_->publish(blurred_risk_map);
         }
         
-        // make combined risk map
-        nav_msgs::msg::OccupancyGrid combined_map;
-        combined_map.header = occupancy_grid_->header;
-        combined_map.info = map_info;
-        combined_map.data = occupancy_grid_->data;
-
-        for(size_t i=0; i < blurred_risk_map.data.size(); i++){
-            if (combined_map.data[i] == 0){
-                combined_map.data[i] = blurred_risk_map.data[i];
-            }
-        }
-        if (combined_map_pub_->get_subscription_count() > 0){
-            combined_map_pub_->publish(combined_map);
-        }
+        RCLCPP_INFO(this->get_logger(), "Published Risk Map.");
     }
 
     PointArray get_point_cloud_array(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
@@ -416,7 +403,6 @@ private:
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr risk_map_pub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr averaged_risk_map_pub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr blurred_risk_map_pub_;
-    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr combined_map_pub_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr feature_points_pub_;
     tf2_ros::Buffer tf_buffer_;
     tf2_ros::TransformListener tf_listener_;
