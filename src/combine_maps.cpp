@@ -31,7 +31,7 @@ public:
         dilated_positive_obstacle_grid_subscriber_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
             "/obstacle_detection/dilated_positive_obstacle_grid", 10, bind(&CombinerNode::dilated_positive_obstacle_grid_callback, this, placeholders::_1));
         filtered_grid_subscriber_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
-            "/obstacle_detection/filtered_risk_map", 10, bind(&CombinerNode::filtered_grid_callback, this, placeholders::_1));
+            "/obstacle_detection/blurred_risk_map", 10, bind(&CombinerNode::filtered_grid_callback, this, placeholders::_1));
         combined_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/obstacle_detection/combined_map", 10);
 
         RCLCPP_INFO(this->get_logger(), "Combiner Node Initialized");
