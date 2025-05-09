@@ -120,7 +120,7 @@ private:
         cv::Mat obstacle_mask = (grid_map == 100);
 
         int expansion_pixels = static_cast<int>(std::ceil(dialation_meters_ / resolution_));
-        int kernel_size = 2 * expansion_pixels + 1;
+        int kernel_size = expansion_pixels + 1;
         cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(kernel_size, kernel_size));
         cv::Mat dilated_mask;
         cv::dilate(obstacle_mask, dilated_mask, kernel);
