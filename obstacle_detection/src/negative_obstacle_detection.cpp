@@ -8,6 +8,7 @@
 #include "geometry_msgs/msg/pose.hpp"
 #include "geometry_msgs/msg/quaternion.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
+#include "obstacle_detection_msgs/msg/risk_map.hpp"
 #include "visualization_msgs/msg/marker.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "nav_msgs/msg/map_meta_data.hpp"
@@ -36,9 +37,12 @@ public:
         occupancy_grid_subscriber_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
             "/obstacle_detection/dilated_positive_obstacle_grid", 10, bind(&NegativeObstacleDetectionNode::occupancy_grid_callback, this, placeholders::_1));
 
-        risk_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/obstacle_detection/risk_map", 10);
-        averaged_risk_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/obstacle_detection/averaged_risk_map", 10);
-        blurred_risk_map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/obstacle_detection/blurred_risk_map", 10);
+        risk_map_pub_ = this->create_publisher<obstacle_detection_msgs::msg::RiskMap>("/obstacle_detection/risk_map", 10);
+        averaged_risk_map_pub_ = this->create_publisher<obstacle_detection_msgs::msg::RiskMap>("/obstacle_detection/averaged_risk_map", 10);
+        blurred_risk_map_pub_ = this->create_publisher<obstacle_detection_msgs::msg::RiskMap>("/obstacle_detection/blurred_risk_map", 10);
+        risk_map_pub_rviz_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/obstacle_detection/risk_map_rviz", 10);
+        averaged_risk_map_pub_rviz_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/obstacle_detection/averaged_risk_map_rviz", 10);
+        blurred_risk_map_pub_rviz_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/obstacle_detection/blurred_risk_map_rviz", 10);
         feature_points_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/obstacle_detection/feature_points", 10);
 
         timer_ = this->create_wall_timer(chrono::milliseconds(100), bind(&NegativeObstacleDetectionNode::transform_callback, this));
@@ -138,10 +142,10 @@ private:
         geometry_msgs::msg::Pose map_origin = map_info.origin;
 
         // make a risk map and a combined map for publishing
-        nav_msgs::msg::OccupancyGrid risk_map;
+        obstacle_detection_msgs::msg::RiskMap risk_map;
         risk_map.header = occupancy_grid_->header;
         risk_map.info = map_info;
-        risk_map.data = vector<int8_t>(width_ * height_, 0);
+        risk_map.data = vector<float>(width_ * height_, 0);
 
         // get the transformation between the LIDAR frame and the costmap frame
         geometry_msgs::msg::Quaternion quaternion = lidar_to_costmap_transform_.transform.rotation;
@@ -178,7 +182,7 @@ private:
 
                 // ensure the cell is within the grid
                 if(0 <= cell_i && cell_i < height_ && 0 <= cell_j && cell_j < width_){
-                    int8_t cell_value = static_cast<int8_t>(min(norm*risk, 100.0f));
+                    float cell_value = norm*risk;
                     // set the risk value in the risk map
                     risk_map.data[cell_i * width_ + cell_j] = cell_value;
                 }
@@ -190,39 +194,45 @@ private:
         }
         risk_map_deque_.push_back(risk_map);
 
-        // temporally filter over the last N risk maps
-        nav_msgs::msg::OccupancyGrid averaged_risk_map = make_averaged_risk_map();
+        obstacle_detection_msgs::msg::RiskMap averaged_risk_map = make_averaged_risk_map();
         if (risk_map_pub_->get_subscription_count() > 0){
             risk_map_pub_->publish(risk_map);
         }
+        if (risk_map_pub_rviz_->get_subscription_count() > 0){
+            nav_msgs::msg::OccupancyGrid risk_map_rviz = risk_map_to_normalized_grid(risk_map);
+            risk_map_pub_rviz_->publish(risk_map_rviz);
+        }
+
+        // temporally filter over the last N risk maps
         if (averaged_risk_map_pub_->get_subscription_count() > 0){
             averaged_risk_map_pub_->publish(averaged_risk_map);
         }
+        if (averaged_risk_map_pub_rviz_->get_subscription_count() > 0){
+            nav_msgs::msg::OccupancyGrid averaged_risk_map_rviz = risk_map_to_normalized_grid(averaged_risk_map);
+            averaged_risk_map_pub_rviz_->publish(averaged_risk_map_rviz);
+        }
 
         // Convert to OpenCV image to apply gaussian blurring
-        cv::Mat averaged_risk_map_image(height_, width_, CV_8UC1);
-        for(int j = 0; j < height_; ++j){
-            for(int i = 0; i < width_; ++i){
-                int idx = j * width_ + i;
-                int8_t value = averaged_risk_map.data[idx];
-                averaged_risk_map_image.at<uint8_t>(j, i) = static_cast<uint8_t>(clamp(value, static_cast<int8_t>(0), static_cast<int8_t>(100)));
-            }
-        }
+        cv::Mat averaged_risk_map_image(height_, width_, CV_32FC1, averaged_risk_map.data.data());
         cv::GaussianBlur(averaged_risk_map_image, averaged_risk_map_image, cv::Size(5, 5), 1.0);
 
         // convert back into occupancy grid and publish the blurred occupancy grid
-        nav_msgs::msg::OccupancyGrid blurred_risk_map = nav_msgs::msg::OccupancyGrid();
+        obstacle_detection_msgs::msg::RiskMap blurred_risk_map = obstacle_detection_msgs::msg::RiskMap();
         blurred_risk_map.header = occupancy_grid_->header;
         blurred_risk_map.info = map_info;
-        blurred_risk_map.data = vector<int8_t>(width_ * height_, 0);
+        blurred_risk_map.data = vector<float>(width_ * height_, 0);
         for(int j = 0; j < height_; ++j){
             for(int i = 0; i < width_; ++i){
                 int idx = j * width_ + i;
-                blurred_risk_map.data[idx] = static_cast<int8_t>(averaged_risk_map_image.at<uint8_t>(j, i));
+                blurred_risk_map.data[idx] = averaged_risk_map_image.at<float>(j, i);
             }
         }
         if (blurred_risk_map_pub_->get_subscription_count() > 0){
             blurred_risk_map_pub_->publish(blurred_risk_map);
+        }
+        if (blurred_risk_map_pub_rviz_->get_subscription_count() > 0){
+            nav_msgs::msg::OccupancyGrid blurred_risk_map_rviz = risk_map_to_normalized_grid(blurred_risk_map);
+            blurred_risk_map_pub_rviz_->publish(blurred_risk_map_rviz);
         }
         
         RCLCPP_INFO(this->get_logger(), "Published Risk Map.");
@@ -304,11 +314,11 @@ private:
         return feature_points_col;
     }
 
-    nav_msgs::msg::OccupancyGrid make_averaged_risk_map(){
-        nav_msgs::msg::OccupancyGrid averaged_risk_map;
+    obstacle_detection_msgs::msg::RiskMap make_averaged_risk_map(){
+        obstacle_detection_msgs::msg::RiskMap averaged_risk_map;
         averaged_risk_map.header = occupancy_grid_->header;
         averaged_risk_map.info = occupancy_grid_->info;
-        averaged_risk_map.data = vector<int8_t>(occupancy_grid_->info.width * occupancy_grid_->info.height, 0);
+        averaged_risk_map.data = vector<float>(occupancy_grid_->info.width * occupancy_grid_->info.height, 0);
         double averaged_map_origin_x = averaged_risk_map.info.origin.position.x;
         double averaged_map_origin_y = averaged_risk_map.info.origin.position.y;
 
@@ -322,7 +332,7 @@ private:
             // extract the cell_value of all previous maps at the given 2D location
             int cell_value_accumulation = 0;
             int maps_included = 0;
-            for(nav_msgs::msg::OccupancyGrid& old_map : risk_map_deque_){
+            for(obstacle_detection_msgs::msg::RiskMap& old_map : risk_map_deque_){
                 geometry_msgs::msg::Pose old_map_origin = old_map.info.origin;
                 int old_map_cell_j = int((averaged_map_cell_x - old_map_origin.position.x) / map_resolution_);
                 int old_map_cell_i = int((averaged_map_cell_y - old_map_origin.position.y) / map_resolution_);
@@ -335,10 +345,30 @@ private:
             }
 
             // save averaged cell value into averaged risk map
-            averaged_risk_map.data[cell_index] = static_cast<uint8_t>(cell_value_accumulation / maps_included);
+            averaged_risk_map.data[cell_index] = cell_value_accumulation / maps_included;
         }  
         return averaged_risk_map;
     }
+
+    nav_msgs::msg::OccupancyGrid risk_map_to_normalized_grid(const obstacle_detection_msgs::msg::RiskMap& risk_map) {
+        nav_msgs::msg::OccupancyGrid grid;
+        grid.header = risk_map.header;
+        grid.info = risk_map.info;
+        grid.data.resize(risk_map.data.size());
+
+        float max_val = *max_element(risk_map.data.begin(), risk_map.data.end());
+
+        for (size_t i = 0; i < risk_map.data.size(); ++i) {
+            if (max_val > 1e-6) {
+                grid.data[i] = static_cast<int8_t>(std::round(100.0f * risk_map.data[i] / max_val));
+            } else {
+                grid.data[i] = 0;
+            }
+        }
+
+        return grid;
+    }
+
 
     vector<pair<int, int>> bresenham_line(int i1, int j1, int i2, int j2){
         vector<pair<int, int>> points;
@@ -400,10 +430,16 @@ private:
 
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr occupancy_grid_subscriber_;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_subscriber_;
-    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr risk_map_pub_;
-    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr averaged_risk_map_pub_;
-    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr blurred_risk_map_pub_;
+
+    rclcpp::Publisher<obstacle_detection_msgs::msg::RiskMap>::SharedPtr risk_map_pub_;
+    rclcpp::Publisher<obstacle_detection_msgs::msg::RiskMap>::SharedPtr averaged_risk_map_pub_;
+    rclcpp::Publisher<obstacle_detection_msgs::msg::RiskMap>::SharedPtr blurred_risk_map_pub_;
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr risk_map_pub_rviz_;
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr averaged_risk_map_pub_rviz_;
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr blurred_risk_map_pub_rviz_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr feature_points_pub_;
+    
+
     tf2_ros::Buffer tf_buffer_;
     tf2_ros::TransformListener tf_listener_;
     rclcpp::TimerBase::SharedPtr timer_;
@@ -414,7 +450,7 @@ private:
     int width_;
     double map_resolution_;
     geometry_msgs::msg::TransformStamped lidar_to_costmap_transform_;
-    deque<nav_msgs::msg::OccupancyGrid> risk_map_deque_;
+    deque<obstacle_detection_msgs::msg::RiskMap> risk_map_deque_;
     long unsigned int deque_max_size_ = 30;
 
     // LIDAR geometry variables

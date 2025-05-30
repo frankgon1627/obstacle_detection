@@ -14,6 +14,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(obstacle_detection_msgs)
 find_package(custom_msgs_pkg REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(pcl_conversions REQUIRED)
@@ -29,6 +30,7 @@ ament_target_dependencies(obstacle_detection_container
     nav_msgs
     geometry_msgs
     visualization_msgs
+    obstacle_detection_msgs
     custom_msgs_pkg
     pcl_conversions
     pcl_ros
@@ -62,6 +64,7 @@ ament_export_dependencies(
     nav_msgs 
     geometry_msgs 
     visualization_msgs
+    obstacle_detection_msgs
     custom_msgs_pkg
     pcl_conversions 
     pcl_ros 
