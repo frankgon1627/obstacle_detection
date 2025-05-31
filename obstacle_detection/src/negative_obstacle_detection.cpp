@@ -38,10 +38,10 @@ public:
             "/obstacle_detection/dilated_positive_obstacle_grid", 10, bind(&NegativeObstacleDetectionNode::occupancy_grid_callback, this, placeholders::_1));
 
         risk_map_pub_ = this->create_publisher<obstacle_detection_msgs::msg::RiskMap>("/obstacle_detection/risk_map", 10);
-        averaged_risk_map_pub_ = this->create_publisher<obstacle_detection_msgs::msg::RiskMap>("/obstacle_detection/averaged_risk_map", 10);
+        aggregated_risk_map_pub_ = this->create_publisher<obstacle_detection_msgs::msg::RiskMap>("/obstacle_detection/aggregated_risk_map", 10);
         blurred_risk_map_pub_ = this->create_publisher<obstacle_detection_msgs::msg::RiskMap>("/obstacle_detection/blurred_risk_map", 10);
         risk_map_pub_rviz_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/obstacle_detection/risk_map_rviz", 10);
-        averaged_risk_map_pub_rviz_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/obstacle_detection/averaged_risk_map_rviz", 10);
+        aggregated_risk_map_pub_rviz_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/obstacle_detection/aggregated_risk_map_rviz", 10);
         blurred_risk_map_pub_rviz_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/obstacle_detection/blurred_risk_map_rviz", 10);
         feature_points_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/obstacle_detection/feature_points", 10);
 
@@ -194,7 +194,6 @@ private:
         }
         risk_map_deque_.push_back(risk_map);
 
-        obstacle_detection_msgs::msg::RiskMap averaged_risk_map = make_averaged_risk_map();
         if (risk_map_pub_->get_subscription_count() > 0){
             risk_map_pub_->publish(risk_map);
         }
@@ -204,17 +203,18 @@ private:
         }
 
         // temporally filter over the last N risk maps
-        if (averaged_risk_map_pub_->get_subscription_count() > 0){
-            averaged_risk_map_pub_->publish(averaged_risk_map);
+        obstacle_detection_msgs::msg::RiskMap aggregated_risk_map = make_aggregated_risk_map("median");
+        if (aggregated_risk_map_pub_->get_subscription_count() > 0){
+            aggregated_risk_map_pub_->publish(aggregated_risk_map);
         }
-        if (averaged_risk_map_pub_rviz_->get_subscription_count() > 0){
-            nav_msgs::msg::OccupancyGrid averaged_risk_map_rviz = risk_map_to_normalized_grid(averaged_risk_map);
-            averaged_risk_map_pub_rviz_->publish(averaged_risk_map_rviz);
+        if (aggregated_risk_map_pub_rviz_->get_subscription_count() > 0){
+            nav_msgs::msg::OccupancyGrid aggregated_risk_map_rviz = risk_map_to_normalized_grid(aggregated_risk_map);
+            aggregated_risk_map_pub_rviz_->publish(aggregated_risk_map_rviz);
         }
 
         // Convert to OpenCV image to apply gaussian blurring
-        cv::Mat averaged_risk_map_image(height_, width_, CV_32FC1, averaged_risk_map.data.data());
-        cv::GaussianBlur(averaged_risk_map_image, averaged_risk_map_image, cv::Size(5, 5), 1.0);
+        cv::Mat aggregated_risk_map_image(height_, width_, CV_32FC1, aggregated_risk_map.data.data());
+        cv::GaussianBlur(aggregated_risk_map_image, aggregated_risk_map_image, cv::Size(5, 5), 1.0);
 
         // convert back into occupancy grid and publish the blurred occupancy grid
         obstacle_detection_msgs::msg::RiskMap blurred_risk_map = obstacle_detection_msgs::msg::RiskMap();
@@ -224,7 +224,7 @@ private:
         for(int j = 0; j < height_; ++j){
             for(int i = 0; i < width_; ++i){
                 int idx = j * width_ + i;
-                blurred_risk_map.data[idx] = averaged_risk_map_image.at<float>(j, i);
+                blurred_risk_map.data[idx] = aggregated_risk_map_image.at<float>(j, i);
             }
         }
         if (blurred_risk_map_pub_->get_subscription_count() > 0){
@@ -314,40 +314,60 @@ private:
         return feature_points_col;
     }
 
-    obstacle_detection_msgs::msg::RiskMap make_averaged_risk_map(){
-        obstacle_detection_msgs::msg::RiskMap averaged_risk_map;
-        averaged_risk_map.header = occupancy_grid_->header;
-        averaged_risk_map.info = occupancy_grid_->info;
-        averaged_risk_map.data = vector<float>(occupancy_grid_->info.width * occupancy_grid_->info.height, 0);
-        double averaged_map_origin_x = averaged_risk_map.info.origin.position.x;
-        double averaged_map_origin_y = averaged_risk_map.info.origin.position.y;
+    obstacle_detection_msgs::msg::RiskMap make_aggregated_risk_map(const std::string& method){
+        obstacle_detection_msgs::msg::RiskMap aggregated_risk_map;
+        aggregated_risk_map.header = occupancy_grid_->header;
+        aggregated_risk_map.info = occupancy_grid_->info;
+        aggregated_risk_map.data = vector<float>(occupancy_grid_->info.width * occupancy_grid_->info.height, 0);
+        double aggregated_map_origin_x = aggregated_risk_map.info.origin.position.x;
+        double aggregated_map_origin_y = aggregated_risk_map.info.origin.position.y;
 
-        for(size_t cell_index=0; cell_index < averaged_risk_map.data.size(); cell_index++){
+        for(size_t cell_index=0; cell_index < aggregated_risk_map.data.size(); cell_index++){
             // get the 2D position of the current cell
-            int averaged_map_cell_i = cell_index % width_;  
-            int averaged_map_cell_j = cell_index / height_;   
-            double averaged_map_cell_x = averaged_map_origin_x + (averaged_map_cell_i + 0.5) * map_resolution_;
-            double averaged_map_cell_y = averaged_map_origin_y + (averaged_map_cell_j + 0.5) * map_resolution_;
-
+            int aggregated_map_cell_i = cell_index % width_;  
+            int aggregated_map_cell_j = cell_index / height_;   
+            double aggregated_map_cell_x = aggregated_map_origin_x + (aggregated_map_cell_i + 0.5) * map_resolution_;
+            double aggregated_map_cell_y = aggregated_map_origin_y + (aggregated_map_cell_j + 0.5) * map_resolution_;
+            
             // extract the cell_value of all previous maps at the given 2D location
-            int cell_value_accumulation = 0;
-            int maps_included = 0;
+            vector<float> cell_values = {};
             for(obstacle_detection_msgs::msg::RiskMap& old_map : risk_map_deque_){
                 geometry_msgs::msg::Pose old_map_origin = old_map.info.origin;
-                int old_map_cell_j = int((averaged_map_cell_x - old_map_origin.position.x) / map_resolution_);
-                int old_map_cell_i = int((averaged_map_cell_y - old_map_origin.position.y) / map_resolution_);
+                int old_map_cell_j = int((aggregated_map_cell_x - old_map_origin.position.x) / map_resolution_);
+                int old_map_cell_i = int((aggregated_map_cell_y - old_map_origin.position.y) / map_resolution_);
 
                 // add to the accumulated cell value if within bounds
                 if(0 <= old_map_cell_i && old_map_cell_i < height_ && 0 <= old_map_cell_j && old_map_cell_j < width_){
-                    cell_value_accumulation += old_map.data[old_map_cell_i * width_ + old_map_cell_j];
-                    ++maps_included;
+                    cell_values.push_back(old_map.data[old_map_cell_i * width_ + old_map_cell_j]);
                 }
             }
 
-            // save averaged cell value into averaged risk map
-            averaged_risk_map.data[cell_index] = cell_value_accumulation / maps_included;
-        }  
-        return averaged_risk_map;
+            if (cell_values.empty()) {
+                aggregated_risk_map.data[cell_index] = 0.0f;
+                continue;
+            }
+
+            // save aggregated cell value into aggregated risk map
+            if (method == "mean") {
+                float sum = accumulate(cell_values.begin(), cell_values.end(), 0.0f);
+                aggregated_risk_map.data[cell_index] = sum / static_cast<float>(cell_values.size());
+            }
+            else if (method == "median") {
+                sort(cell_values.begin(), cell_values.end());
+                size_t mid = cell_values.size() / 2;
+                if (cell_values.size() % 2 == 0) {
+                    aggregated_risk_map.data[cell_index] = (cell_values[mid - 1] + cell_values[mid]) / 2.0f;
+                } 
+                else {
+                    aggregated_risk_map.data[cell_index] = cell_values[mid];
+                }
+            }  
+            else{
+                RCLCPP_WARN(this->get_logger(), "Not a valid aggregation method. Setting values to zero.");
+                aggregated_risk_map.data[cell_index] = 0.0;
+            }
+        }
+        return aggregated_risk_map;
     }
 
     nav_msgs::msg::OccupancyGrid risk_map_to_normalized_grid(const obstacle_detection_msgs::msg::RiskMap& risk_map) {
@@ -432,10 +452,10 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_subscriber_;
 
     rclcpp::Publisher<obstacle_detection_msgs::msg::RiskMap>::SharedPtr risk_map_pub_;
-    rclcpp::Publisher<obstacle_detection_msgs::msg::RiskMap>::SharedPtr averaged_risk_map_pub_;
+    rclcpp::Publisher<obstacle_detection_msgs::msg::RiskMap>::SharedPtr aggregated_risk_map_pub_;
     rclcpp::Publisher<obstacle_detection_msgs::msg::RiskMap>::SharedPtr blurred_risk_map_pub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr risk_map_pub_rviz_;
-    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr averaged_risk_map_pub_rviz_;
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr aggregated_risk_map_pub_rviz_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr blurred_risk_map_pub_rviz_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr feature_points_pub_;
     
