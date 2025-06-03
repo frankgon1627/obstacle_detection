@@ -108,9 +108,9 @@ private:
         nav_msgs::msg::OccupancyGrid combined_map_rviz;
         combined_map_rviz.header = blurred_grid_rviz->header;
         combined_map_rviz.info = blurred_grid_rviz->info;;
-        combined_map_rviz.data.resize(blurred_grid->data.size());
-        double combined_map_origin_x = combined_map.info.origin.position.x;
-        double combined_map_origin_y = combined_map.info.origin.position.y;
+        combined_map_rviz.data.resize(blurred_grid_rviz->data.size());
+        double combined_map_origin_x = combined_map_rviz.info.origin.position.x;
+        double combined_map_origin_y = combined_map_rviz.info.origin.position.y;
 
         // make combined risk map
         for(size_t cell_index=0; cell_index < combined_map_rviz.data.size(); cell_index++){
