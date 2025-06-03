@@ -81,11 +81,9 @@ private:
             int pos_grid_i = int((cell_y - dilated_positive_origin_.position.y) / map_resolution_);
             int flattened_index = pos_grid_i * width_ + pos_grid_j;
 
-            if(0 <= pos_grid_i && pos_grid_i < height_ && 0 <= pos_grid_j && pos_grid_j < width_){
-                int flattened_index = pos_grid_i * width_ + pos_grid_j;
-                if (dilated_positive_obstacle_grid_->data[flattened_index] == 100){
-                    combined_map.data[cell_index] = 100;
-                }
+            bool in_bounds = (0 <= pos_grid_i && pos_grid_i < height_ && 0 <= pos_grid_j && pos_grid_j < width_);
+            if(in_bounds && dilated_positive_obstacle_grid_->data[flattened_index] == 100){
+                combined_map.data[cell_index] = 100;
             }
             else{
                 combined_map.data[cell_index] = blurred_grid->data[cell_index];
@@ -126,12 +124,11 @@ private:
             // get the cell value of the dilated positive grid at this 2D location
             int pos_grid_j = int((cell_x - dilated_positive_origin_.position.x) / map_resolution_);
             int pos_grid_i = int((cell_y - dilated_positive_origin_.position.y) / map_resolution_);
+            int flattened_index = pos_grid_i * width_ + pos_grid_j;
 
-            if(0 <= pos_grid_i && pos_grid_i < height_ && 0 <= pos_grid_j && pos_grid_j < width_){
-                int flattened_index = pos_grid_i * width_ + pos_grid_j;
-                if (dilated_positive_obstacle_grid_->data[flattened_index] == 100){
-                    combined_map_rviz.data[cell_index] = 100;
-                }
+            bool in_bounds = (0 <= pos_grid_i && pos_grid_i < height_ && 0 <= pos_grid_j && pos_grid_j < width_);
+            if(in_bounds && dilated_positive_obstacle_grid_->data[flattened_index] == 100){
+                combined_map_rviz.data[cell_index] = 100;
             }
             else{
                 combined_map_rviz.data[cell_index] = blurred_grid_rviz->data[cell_index];
