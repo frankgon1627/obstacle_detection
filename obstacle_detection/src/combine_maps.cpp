@@ -48,6 +48,7 @@ private:
         height_ = dilated_positive_obstacle_grid_->info.height;
         width_ = dilated_positive_obstacle_grid_->info.width;
         map_resolution_ = dilated_positive_obstacle_grid_->info.resolution;
+        dilated_positive_origin_ = dilated_positive_obstacle_grid_->info.origin;
     }
 
     void blurred_grid_callback(const obstacle_detection_msgs::msg::RiskMap::SharedPtr msg){
@@ -61,17 +62,28 @@ private:
 
         // extract relevant Occupancy Grid Information
         obstacle_detection_msgs::msg::RiskMap combined_map;
-        combined_map.header = dilated_positive_obstacle_grid_->header;
-        combined_map.info = dilated_positive_obstacle_grid_->info;;
-        combined_map.data.resize(dilated_positive_obstacle_grid_->data.size());
+        combined_map.header = blurred_grid->header;
+        combined_map.info = blurred_grid->info;
+        combined_map.data.resize(blurred_grid->data.size());
 
         // make combined risk map
-        for(size_t i=0; i < dilated_positive_obstacle_grid_->data.size(); i++){
-            if (dilated_positive_obstacle_grid_->data[i] == 100){
-                combined_map.data[i] = static_cast<float>(dilated_positive_obstacle_grid_->data[i]);
+        for(size_t cell_index=0; cell_index < combined_map.data.size(); cell_index++){
+            // get the 2D position of the current cell of the combined grid
+            int cell_i = cell_index % width_;
+            int cell_j = cell_index / height_;  
+            double cell_x = combined_map.info.origin.position.x + (cell_i + 0.5)*map_resolution_;
+            double cell_y = combined_map.info.origin.position.y + (cell_j + 0.5)*map_resolution_;
+
+            // get the cell value of the dilated positive grid at this 2D location
+            int dilated_positive_grid_i = int((cell_x - dilated_positive_origin_.position.x)/map_resolution_);
+            int dilated_positive_grid_j = int((cell_y - dilated_positive_origin_.position.y)/map_resolution_);
+            int flattened_index = dilated_positive_grid_i * width_ + dilated_positive_grid_j;
+
+            if (dilated_positive_obstacle_grid_->data[flattened_index] == 100){
+                combined_map.data[cell_index] = static_cast<float>(dilated_positive_obstacle_grid_->data[flattened_index]);
             }
             else{
-                combined_map.data[i] = blurred_grid->data[i];
+                combined_map.data[cell_index] = blurred_grid->data[cell_index];
             }
         }
 
@@ -97,14 +109,26 @@ private:
         combined_map_rviz.data = dilated_positive_obstacle_grid_->data;
 
         // make combined risk map
-        for(size_t i=0; i < dilated_positive_obstacle_grid_->data.size(); i++){
-            if (dilated_positive_obstacle_grid_->data[i] == 100){
-                combined_map_rviz.data[i] = dilated_positive_obstacle_grid_->data[i];
+        for(size_t cell_index=0; cell_index < combined_map_rviz.data.size(); cell_index++){
+            // get the 2D position of the current cell of the combined grid
+            int cell_i = cell_index % width_;
+            int cell_j = cell_index / height_;  
+            double cell_x = combined_map_rviz.info.origin.position.x + (cell_i + 0.5)*map_resolution_;
+            double cell_y = combined_map_rviz.info.origin.position.y + (cell_j + 0.5)*map_resolution_;
+
+            // get the cell value of the dilated positive grid at this 2D location
+            int dilated_positive_grid_i = int((cell_x - dilated_positive_origin_.position.x)/map_resolution_);
+            int dilated_positive_grid_j = int((cell_y - dilated_positive_origin_.position.y)/map_resolution_);
+            int flattened_index = dilated_positive_grid_i * width_ + dilated_positive_grid_j;
+
+            if (dilated_positive_obstacle_grid_->data[flattened_index] == 100){
+                combined_map_rviz.data[cell_index] = static_cast<float>(dilated_positive_obstacle_grid_->data[flattened_index]);
             }
             else{
-                combined_map_rviz.data[i] = blurred_grid_rviz->data[i];
+                combined_map_rviz.data[cell_index] = blurred_grid_rviz->data[cell_index];
             }
         }
+
         if (combined_map_rviz_pub_->get_subscription_count() > 0){
             combined_map_rviz_pub_->publish(combined_map_rviz);
         }
@@ -122,6 +146,7 @@ private:
     int height_;
     int width_;
     double map_resolution_;
+    geometry_msgs::msg::Pose dilated_positive_origin_;
 };
 }
 

@@ -10,6 +10,7 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "obstacle_detection_msgs/msg/risk_map.hpp"
 #include "visualization_msgs/msg/marker.hpp"
+#include <nav_msgs/msg/odometry.hpp>
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "nav_msgs/msg/map_meta_data.hpp"
 #include "tf2_ros/buffer.h"
@@ -34,8 +35,8 @@ public:
         point_cloud_qos.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
         point_cloud_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/ouster/points", point_cloud_qos, bind(&NegativeObstacleDetectionNode::point_cloud_callback, this, placeholders::_1));
-        occupancy_grid_subscriber_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
-            "/obstacle_detection/dilated_positive_obstacle_grid", 10, bind(&NegativeObstacleDetectionNode::occupancy_grid_callback, this, placeholders::_1));
+        odometry_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
+            "/dlio/odom_node/odom", 10, bind(&NegativeObstacleDetectionNode::odometry_callback, this, placeholders::_1));
 
         risk_map_pub_ = this->create_publisher<obstacle_detection_msgs::msg::RiskMap>("/obstacle_detection/risk_map", 10);
         aggregated_risk_map_pub_ = this->create_publisher<obstacle_detection_msgs::msg::RiskMap>("/obstacle_detection/aggregated_risk_map", 10);
@@ -77,23 +78,14 @@ public:
     }
 
 private:
-    void occupancy_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg){
-        occupancy_grid_ = msg;
-        height_ = occupancy_grid_->info.height;
-        width_ = occupancy_grid_->info.width;
-        map_resolution_ = occupancy_grid_->info.resolution;
+    void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
+        odometry_ = *msg;
     }
 
     void transform_callback(){
-        if (!occupancy_grid_)
-        {
-            RCLCPP_WARN(this->get_logger(), "Occupancy grid not received yet");
-            return;
-        }
-
         try{
             string from_frame = "os_lidar";
-            string to_frame = occupancy_grid_->header.frame_id;
+            string to_frame = "odom";
 
             lidar_to_costmap_transform_ = tf_buffer_.lookupTransform(to_frame, from_frame, tf2::TimePointZero);
         }
@@ -104,12 +96,6 @@ private:
 
     void point_cloud_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
-        if (!occupancy_grid_)
-        {
-            RCLCPP_WARN(this->get_logger(), "Occupancy grid not received yet");
-            return;
-        }
-
         if (lidar_to_costmap_transform_.header.frame_id.empty())
         {
             RCLCPP_WARN(this->get_logger(), "Transform not received yet");
@@ -136,15 +122,17 @@ private:
         if (feature_points_pub_->get_subscription_count() > 0){
             publish_feature_points(feature_points);
         }
-        
-        // extract relevant Occupancy Grid Information
-        nav_msgs::msg::MapMetaData map_info = occupancy_grid_->info;
-        geometry_msgs::msg::Pose map_origin = map_info.origin;
 
         // make a risk map and a combined map for publishing
         obstacle_detection_msgs::msg::RiskMap risk_map;
-        risk_map.header = occupancy_grid_->header;
-        risk_map.info = map_info;
+        risk_map.header.stamp = this->now();
+        risk_map.header.frame_id = "odom";
+        risk_map.info.height = height_;
+        risk_map.info.width = width_;
+        risk_map.info.resolution = map_resolution_;
+        risk_map.info.origin.position.x = odometry_.pose.pose.position.x - static_cast<double>(width_) * map_resolution_ / 2.0;
+        risk_map.info.origin.position.y = odometry_.pose.pose.position.y - static_cast<double>(height_) * map_resolution_ / 2.0;
+        risk_map.info.origin.position.z = odometry_.pose.pose.position.z;
         risk_map.data = vector<float>(width_ * height_, 0);
 
         // get the transformation between the LIDAR frame and the costmap frame
@@ -170,6 +158,7 @@ private:
             float norm = sqrt(pow(point1_cost_frame.x(), 2) + pow(point1_cost_frame.y(), 2));
 
             // determine the 2D index in the cost_map data array
+            geometry_msgs::msg::Pose map_origin = risk_map.info.origin;
             int j1 = int((point1_cost_frame.x() - map_origin.position.x) / map_resolution_);
             int i1 = int((point1_cost_frame.y() - map_origin.position.y) / map_resolution_);
             int j2 = int((point2_cost_frame.x() - map_origin.position.x) / map_resolution_);
@@ -203,7 +192,7 @@ private:
         }
 
         // temporally filter over the last N risk maps
-        obstacle_detection_msgs::msg::RiskMap aggregated_risk_map = make_aggregated_risk_map("median");
+        obstacle_detection_msgs::msg::RiskMap aggregated_risk_map = make_aggregated_risk_map(risk_map, "median");
         if (aggregated_risk_map_pub_->get_subscription_count() > 0){
             aggregated_risk_map_pub_->publish(aggregated_risk_map);
         }
@@ -218,8 +207,8 @@ private:
 
         // convert back into occupancy grid and publish the blurred occupancy grid
         obstacle_detection_msgs::msg::RiskMap blurred_risk_map = obstacle_detection_msgs::msg::RiskMap();
-        blurred_risk_map.header = occupancy_grid_->header;
-        blurred_risk_map.info = map_info;
+        blurred_risk_map.header = risk_map.header;
+        blurred_risk_map.info = risk_map.info;
         blurred_risk_map.data = vector<float>(width_ * height_, 0);
         for(int j = 0; j < height_; ++j){
             for(int i = 0; i < width_; ++i){
@@ -314,11 +303,11 @@ private:
         return feature_points_col;
     }
 
-    obstacle_detection_msgs::msg::RiskMap make_aggregated_risk_map(const std::string& method){
+    obstacle_detection_msgs::msg::RiskMap make_aggregated_risk_map(obstacle_detection_msgs::msg::RiskMap& risk_map, string method){
         obstacle_detection_msgs::msg::RiskMap aggregated_risk_map;
-        aggregated_risk_map.header = occupancy_grid_->header;
-        aggregated_risk_map.info = occupancy_grid_->info;
-        aggregated_risk_map.data = vector<float>(occupancy_grid_->info.width * occupancy_grid_->info.height, 0);
+        aggregated_risk_map.header = risk_map.header;
+        aggregated_risk_map.info = risk_map.info;
+        aggregated_risk_map.data = vector<float>(width_ * height_, 0);
         double aggregated_map_origin_x = aggregated_risk_map.info.origin.position.x;
         double aggregated_map_origin_y = aggregated_risk_map.info.origin.position.y;
 
@@ -448,8 +437,8 @@ private:
         feature_points_pub_->publish(marker);
     }
 
-    rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr occupancy_grid_subscriber_;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_subscriber_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscriber_;
 
     rclcpp::Publisher<obstacle_detection_msgs::msg::RiskMap>::SharedPtr risk_map_pub_;
     rclcpp::Publisher<obstacle_detection_msgs::msg::RiskMap>::SharedPtr aggregated_risk_map_pub_;
@@ -459,16 +448,16 @@ private:
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr blurred_risk_map_pub_rviz_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr feature_points_pub_;
     
+    nav_msgs::msg::Odometry odometry_;
 
     tf2_ros::Buffer tf_buffer_;
     tf2_ros::TransformListener tf_listener_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     // Obstacle map variables
-    nav_msgs::msg::OccupancyGrid::SharedPtr occupancy_grid_;
-    int height_;
-    int width_;
-    double map_resolution_;
+    int height_ = 100;
+    int width_ = 100;
+    double map_resolution_ = 0.2;
     geometry_msgs::msg::TransformStamped lidar_to_costmap_transform_;
     deque<obstacle_detection_msgs::msg::RiskMap> risk_map_deque_;
     long unsigned int deque_max_size_ = 30;
