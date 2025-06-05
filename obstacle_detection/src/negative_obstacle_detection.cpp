@@ -455,8 +455,8 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
 
     // Obstacle map variables
-    int height_ = 100;
-    int width_ = 100;
+    int height_ = 200;
+    int width_ = 200;
     double map_resolution_ = 0.2;
     geometry_msgs::msg::TransformStamped lidar_to_costmap_transform_;
     deque<obstacle_detection_msgs::msg::RiskMap> risk_map_deque_;
