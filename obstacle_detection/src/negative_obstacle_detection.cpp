@@ -173,7 +173,7 @@ private:
                 if(0 <= cell_i && cell_i < height_ && 0 <= cell_j && cell_j < width_){
                     float cell_value = norm*risk;
                     // set the risk value in the risk map
-                    risk_map.data[cell_i * width_ + cell_j] = cell_value;
+                    risk_map.data[cell_i * width_ + cell_j] = max(risk, 10.0f);
                 }
             }
         }
