@@ -173,7 +173,7 @@ private:
                 if(0 <= cell_i && cell_i < height_ && 0 <= cell_j && cell_j < width_){
                     float cell_value = norm*risk;
                     // set the risk value in the risk map
-                    risk_map.data[cell_i * width_ + cell_j] = max(risk, 10.0f);
+                    risk_map.data[cell_i * width_ + cell_j] = risk;
                 }
             }
         }
@@ -203,7 +203,7 @@ private:
 
         // Convert to OpenCV image to apply gaussian blurring
         cv::Mat aggregated_risk_map_image(height_, width_, CV_32FC1, aggregated_risk_map.data.data());
-        cv::GaussianBlur(aggregated_risk_map_image, aggregated_risk_map_image, cv::Size(11, 1), 3.0);
+        cv::GaussianBlur(aggregated_risk_map_image, aggregated_risk_map_image, cv::Size(11, 11), 3.0);
 
         // convert back into occupancy grid and publish the blurred occupancy grid
         obstacle_detection_msgs::msg::RiskMap blurred_risk_map = obstacle_detection_msgs::msg::RiskMap();
