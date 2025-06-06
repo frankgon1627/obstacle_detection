@@ -192,9 +192,9 @@ private:
 
     nav_msgs::msg::Odometry odom_;
 
-    double resolution_ = 0.2;
-    int width_ = 200;
-    int height_ = 200;
+    double resolution_ = 0.4;
+    int width_ = 100;
+    int height_ = 100;
     double dialation_meters_ = 0.75;
 };
 }
